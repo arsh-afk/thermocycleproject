@@ -11,10 +11,25 @@ class DieselCycle(BaseCycle):
         
     def solve(self, params):
         self.clear_states()
-        r = params['r']
-        rc = params['rc']
-        T1 = params.get('T_min', 25) + 273.15
-        P1 = params.get('P_min', 0.1) * 1e6
+        
+        # Mapping UI keys and providing defaults
+        defaults = {
+            'r': 16.0,
+            'rc': 2.0,
+            'T_min': 25.0 + 273.15,
+            'P_min': 0.1 * 1e6,
+        }
+        
+        current = defaults.copy()
+        if 'r' in params: current['r'] = params['r']
+        if 'rc' in params: current['rc'] = params['rc']
+        if 'T_min' in params: current['T_min'] = params['T_min'] + 273.15
+        if 'P_min' in params: current['P_min'] = params['P_min'] * 1e6
+        
+        r = current['r']
+        rc = current['rc']
+        T1 = current['T_min']
+        P1 = current['P_min']
         
         self.states[1] = self.get_state('P', P1, 'T', T1, "Intake BDC")
         
@@ -62,9 +77,11 @@ class DieselCycle(BaseCycle):
 
     def validate_inputs(self, params):
         errors = []
-        if params['r'] <= 1:
+        r = params.get('r', 16.0)
+        rc = params.get('rc', 2.0)
+        if r <= 1:
             errors.append("Compression ratio must be greater than 1.")
-        if params['rc'] <= 1:
+        if rc <= 1:
             errors.append("Cutoff ratio must be greater than 1.")
         return errors
 

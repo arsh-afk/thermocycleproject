@@ -25,10 +25,26 @@ class sCO2Cycle(BaseCycle):
         
     def solve(self, params):
         self.clear_states()
-        P_low = params['P_min'] * 1e6
-        P_high = params['P_max'] * 1e6
-        T_min = params['T_min'] + 273.15
-        T_max = params['T_max'] + 273.15
+        
+        # Mapping UI keys and providing defaults
+        defaults = {
+            'P_min': 7.6 * 1e6,
+            'P_max': 25.0 * 1e6,
+            'T_min': 32.0 + 273.15,
+            'T_max': 550.0 + 273.15,
+        }
+        
+        current = defaults.copy()
+        if 'P_min' in params: current['P_min'] = params['P_min'] * 1e6
+        if 'P_max' in params: current['P_max'] = params['P_max'] * 1e6
+        if 'T_min' in params: current['T_min'] = params['T_min'] + 273.15
+        if 'T_max' in params: current['T_max'] = params['T_max'] + 273.15
+        
+        P_low = current['P_min']
+        P_high = current['P_max']
+        T_min = current['T_min']
+        T_max = current['T_max']
+        
         self.split = min(max(params.get('split_frac', 0.35), 0.05), 0.95)
         eta_recup = params.get('recup_eff', 0.95)
         eta_c = params.get('eta_c', 0.89)
@@ -97,13 +113,18 @@ class sCO2Cycle(BaseCycle):
 
     def validate_inputs(self, params):
         errs = []
-        if params['P_min'] >= params['P_max']:
+        p_min = params.get('P_min', 7.6)
+        p_max = params.get('P_max', 25.0)
+        t_min = params.get('T_min', 32.0)
+        t_max = params.get('T_max', 550.0)
+        
+        if p_min >= p_max:
             errs.append("P_max must be greater than P_min.")
-        if params['T_min'] >= params['T_max']:
+        if t_min >= t_max:
             errs.append("T_max must be greater than T_min.")
-        if params['P_min'] < 7.38:
+        if p_min < 7.38:
             errs.append("WARNING: Low pressure below 7.38 MPa risks two-phase condensation in compressor.")
-        if params['T_min'] < 32:
+        if t_min < 32:
             errs.append("WARNING: Operating too close to T_crit (31.1°C) causes numerical instability.")
         return errs
 

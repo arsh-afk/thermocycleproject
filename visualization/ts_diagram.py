@@ -38,8 +38,6 @@ class TSDiagram:
             logger.debug("Unable to plot saturation dome for %s: %s", fluid_name, exc)
 
         # 2. Plot Cycle Path
-        # Handle N-states sequentially
-        # SOURCE: Cycle state point results from core solvers
         sorted_keys = sorted(states.keys())
         s_vals = [states[k].s/1000 for k in sorted_keys]
         T_vals = [states[k].T - 273.15 for k in sorted_keys]
@@ -53,21 +51,23 @@ class TSDiagram:
             text=[str(k) for k in sorted_keys] + [""],
             textposition="top center",
             name='Cycle Path',
-            line=dict(color='cyan', width=2),
-            marker=dict(size=8, color='white')
+            line=dict(color='#2ca8ff', width=3), # Branded Cool Cyan
+            marker=dict(size=10, color='white', line=dict(color='#0f1f3d', width=2))
         ))
         
-        # Annotate Phase Regions
-        # SOURCE: Fundamental Thermodynamics - Phase boundaries
-        fig.add_annotation(x=min(s_vals), y=min(T_vals), text="Subcooled", showarrow=False, font=dict(color="grey"))
-        fig.add_annotation(x=max(s_vals), y=max(T_vals), text="Superheated", showarrow=False, font=dict(color="grey"))
-
         fig.update_layout(
-            title=f"T-s Diagram: {cycle_name}",
+            title=dict(
+                text=f"<b>T-s Diagram: {cycle_name}</b>",
+                font=dict(size=20, color='#f8fafc')
+            ),
             xaxis_title="Specific Entropy (kJ/kg·K)",
             yaxis_title="Temperature (°C)",
             template="plotly_dark",
-            height=600
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=600,
+            hovermode="x unified",
+            margin=dict(l=40, r=40, t=60, b=40)
         )
         
         return fig

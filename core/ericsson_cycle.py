@@ -11,10 +11,25 @@ class EricssonCycle(BaseCycle):
         
     def solve(self, params):
         self.clear_states()
-        T_hot = params['T_max'] + 273.15
-        T_cold = params['T_min'] + 273.15
-        P_max = params['P_max'] * 1e6
-        P_min = params['P_min'] * 1e6
+        
+        # Mapping UI keys and providing defaults
+        defaults = {
+            'T_max': 800.0 + 273.15,
+            'T_min': 25.0 + 273.15,
+            'P_max': 10.0 * 1e6,
+            'P_min': 0.1 * 1e6,
+        }
+        
+        current = defaults.copy()
+        if 'T_max' in params: current['T_max'] = params['T_max'] + 273.15
+        if 'T_min' in params: current['T_min'] = params['T_min'] + 273.15
+        if 'P_max' in params: current['P_max'] = params['P_max'] * 1e6
+        if 'P_min' in params: current['P_min'] = params['P_min'] * 1e6
+        
+        T_hot = current['T_max']
+        T_cold = current['T_min']
+        P_max = current['P_max']
+        P_min = current['P_min']
         
         self.states[3] = self.get_state('P', P_max, 'T', T_hot, "Heating Exit")
         self.states[4] = self.get_state('P', P_min, 'T', T_hot, "Expansion Exit")
@@ -47,9 +62,14 @@ class EricssonCycle(BaseCycle):
 
     def validate_inputs(self, params):
         errors = []
-        if params['P_min'] >= params['P_max']:
+        p_min = params.get('P_min', 0.1)
+        p_max = params.get('P_max', 10.0)
+        t_min = params.get('T_min', 25.0)
+        t_max = params.get('T_max', 800.0)
+        
+        if p_min >= p_max:
             errors.append("P_max must be greater than P_min.")
-        if params['T_min'] >= params['T_max']:
+        if t_min >= t_max:
             errors.append("T_max must be greater than T_min.")
         return errors
 

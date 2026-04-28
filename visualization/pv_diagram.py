@@ -51,18 +51,25 @@ class PVDiagram:
             text=[str(k) for k in sorted_keys] + [""],
             textposition="top center",
             name='Cycle Path',
-            line=dict(color='orange', width=2),
-            marker=dict(size=8, color='white')
+            line=dict(color='#ffaa00', width=3), # Branded Warm Amber
+            marker=dict(size=10, color='white', line=dict(color='#0f1f3d', width=2))
         ))
         
         fig.update_layout(
-            title=f"P-v Diagram: {cycle_name}",
+            title=dict(
+                text=f"<b>P-v Diagram: {cycle_name}</b>",
+                font=dict(size=20, color='#f8fafc')
+            ),
             xaxis_title="Specific Volume (m³/kg)",
             yaxis_title="Pressure (MPa)",
-            xaxis_type="log", # SOURCE: Standard log-log scale for P-v
+            xaxis_type="log",
             yaxis_type="log",
             template="plotly_dark",
-            height=600
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            height=600,
+            hovermode="x unified",
+            margin=dict(l=40, r=40, t=60, b=40)
         )
         
         return fig

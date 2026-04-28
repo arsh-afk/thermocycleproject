@@ -24,10 +24,59 @@ class BaseCycle(ABC):
         self.entropy_generation = 0.0
         self.second_law_efficiency = None
 
-    @abstractmethod
-    def solve(self, params):
-        """Main entry point to solve the cycle state points."""
-        pass
+    def solve_with_targets(self, params):
+        """
+        Handles iterative solving if targets like efficiency, w_net, or q_in are provided.
+        Otherwise, falls back to normal solve.
+        """
+        targets = {k: params[k] for k in params if k in ['efficiency', 'w_net', 'q_in']}
+        if not targets:
+            return self.solve(params)
+        
+        # If we have targets, we need to iterate on a 'free' variable to hit them.
+        # For simplicity, we choose T_max or P_max as the iteration variable.
+        from core.solver import Solver
+        
+        target_key = list(targets.keys())[0]
+        target_val = targets[target_key]
+        
+        # We need to decide which variable to vary. 
+        # If P_max is fixed by user, vary T_max. If T_max is fixed, vary P_max.
+        # If neither is fixed, vary T_max.
+        iter_var = 'T_max'
+        if 'T_max' in params:
+            iter_var = 'P_max'
+            
+        def objective(x):
+            test_params = params.copy()
+            test_params[iter_var] = x
+            # Remove targets from test_params to avoid infinite recursion
+            for t in targets: test_params.pop(t)
+            
+            self.solve(test_params)
+            metrics = self.calculate_performance()
+            
+            if target_key == 'efficiency':
+                return metrics.get('efficiency', 0.0) - target_val
+            elif target_key == 'w_net':
+                return metrics.get('w_net', 0.0) - target_val
+            elif target_key == 'q_in':
+                return metrics.get('q_in', 0.0) - target_val
+            return 0.0
+
+        # Define search range based on iter_var
+        if iter_var == 'T_max':
+            low, high = 100.0, 1500.0
+        else:
+            low, high = 0.1, 50.0
+            
+        result = Solver.bisection(objective, low, high)
+        
+        # Final solve with the found value
+        final_params = params.copy()
+        final_params[iter_var] = result
+        for t in targets: final_params.pop(t)
+        return self.solve(final_params)
 
     @abstractmethod
     def calculate_performance(self):

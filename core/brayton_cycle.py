@@ -41,10 +41,26 @@ class BraytonCycle(BaseCycle):
 
     def solve(self, params):
         self.clear_states()
-        P_min = params['P_min'] * 1e6
-        P_max = params['P_max'] * 1e6
-        T_min = params['T_min'] + 273.15
-        T_max = params['T_max'] + 273.15
+        
+        # Mapping UI keys and providing defaults
+        defaults = {
+            'P_min': 0.1 * 1e6,
+            'P_max': 1.2 * 1e6,
+            'T_min': 25.0 + 273.15,
+            'T_max': 1100.0 + 273.15,
+        }
+        
+        current = defaults.copy()
+        if 'P_min' in params: current['P_min'] = params['P_min'] * 1e6
+        if 'P_max' in params: current['P_max'] = params['P_max'] * 1e6
+        if 'T_min' in params: current['T_min'] = params['T_min'] + 273.15
+        if 'T_max' in params: current['T_max'] = params['T_max'] + 273.15
+        
+        P_min = current['P_min']
+        P_max = current['P_max']
+        T_min = current['T_min']
+        T_max = current['T_max']
+        
         n_ic = max(0, int(params.get('n_ic', 0)))
         n_rh = max(0, int(params.get('n_rh', 0)))
         
@@ -66,6 +82,7 @@ class BraytonCycle(BaseCycle):
         for i in range(n_ic + 1):
             p_out = st_in.P * pr_stage_c
             st_out = self.compressor.solve(st_in, p_out, eta_c, self.fluid)
+            st_out.note = f"Compressor {i+1} Exit"
             self.states[len(self.states)+1] = st_out
             self._w_comp += st_out.h - st_in.h
             
@@ -81,6 +98,7 @@ class BraytonCycle(BaseCycle):
         for i in range(n_rh + 1):
             p_out = t_in.P / pr_stage_t
             st_out = self.turbine.solve(t_in, p_out, eta_t, self.fluid)
+            st_out.note = f"Turbine {i+1} Exit"
             self.states[len(self.states)+1] = st_out
             self._w_turb += t_in.h - st_out.h
             
@@ -90,3 +108,39 @@ class BraytonCycle(BaseCycle):
                 self._q_in += t_in.h - st_out.h
         
         return self.states
+
+    def calculate_performance(self):
+        if not self.states:
+            return {}
+        w_net = self._w_turb - self._w_comp
+        efficiency = (w_net / self._q_in) * 100 if self._q_in > 0 else 0
+        
+        # Approximate q_out for entropy gen
+        last_state = self.states[max(self.states)]
+        q_out = last_state.h - self.states[1].h
+        
+        s_gen = self.calculate_entropy_generation(self._q_in, self.T_hot, q_out, self.T_cold)
+        sl_eff = self.calculate_second_law_efficiency(efficiency, self.T_hot, self.T_cold)
+        
+        self.metrics = {
+            'efficiency': efficiency,
+            'w_net': w_net / 1000,
+            'q_in': self._q_in / 1000,
+            'q_out': q_out / 1000,
+            's_gen': s_gen,
+            'second_law_efficiency': sl_eff,
+        }
+        return self.metrics
+
+    def validate_inputs(self, params):
+        errors = []
+        p_min = params.get('P_min', 0.1)
+        p_max = params.get('P_max', 1.2)
+        t_min = params.get('T_min', 25.0)
+        t_max = params.get('T_max', 1100.0)
+        
+        if p_min >= p_max:
+            errors.append("P_max must be greater than P_min.")
+        if t_min >= t_max:
+            errors.append("T_max must be greater than T_min.")
+        return errors

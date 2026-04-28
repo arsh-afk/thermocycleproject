@@ -17,6 +17,7 @@ root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if root_path not in sys.path:
     sys.path.append(root_path)
 
+from core.cycle_control import CycleControl
 from core.brayton_cycle import BraytonCycle
 from core.diesel_cycle import DieselCycle
 from core.ericsson_cycle import EricssonCycle
@@ -33,13 +34,176 @@ logger = logging.getLogger(__name__)
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Thermo Cycle Explorer Pro", page_icon="🔥", layout="wide")
 
+# Modern Dark Theme Palette
+BG_DARK = "#0f172a"
+CARD_DARK = "#1e293b"
+SIDEBAR_DARK = "#020617"
+ACCENT_CYAN = "#38bdf8"
+ACCENT_AMBER = "#fbbf24"
+TEXT_LIGHT = "#f8fafc"
+TEXT_DIM = "#94a3b8"
+BORDER_DARK = "#334155"
+
 st.markdown(
-    """
+    f"""
     <style>
-        .stMetric { background-color: #1a1c23; padding: 15px; border-radius: 10px; border: 1px solid #444; }
-        .stProgress > div > div > div > div { background-color: #2ecc71; }
-        .sidebar .sidebar-content { width: 450px; }
-        .block-container { padding-top: 1rem; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto+Mono&display=swap');
+        
+        html, body, [class*="st-"] {{
+            font-family: 'Inter', sans-serif;
+            color: {TEXT_LIGHT};
+        }}
+        
+        .stApp {{
+            background-color: {BG_DARK};
+        }}
+        
+        .main {{
+            background-color: {BG_DARK};
+        }}
+        
+        /* Metric Cards Styling */
+        div[data-testid="stMetric"] {{
+            background-color: {CARD_DARK};
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid {BORDER_DARK};
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+        }}
+        
+        div[data-testid="stMetric"]:hover {{
+            transform: translateY(-2px);
+            border-color: {ACCENT_CYAN};
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+        }}
+        
+        div[data-testid="stMetricValue"] {{
+            color: {ACCENT_CYAN} !important;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }}
+        
+        div[data-testid="stMetricLabel"] {{
+            color: {TEXT_DIM} !important;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }}
+        
+        /* Sidebar Styling */
+        section[data-testid="stSidebar"] {{
+            background-color: {SIDEBAR_DARK};
+            border-right: 1px solid {BORDER_DARK};
+        }}
+        
+        section[data-testid="stSidebar"] .stText, 
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] .stMarkdown,
+        section[data-testid="stSidebar"] p {{
+            color: {TEXT_LIGHT} !important;
+        }}
+        
+        /* Sidebar Inputs */
+        .stSelectbox, .stMultiSelect, .stNumberInput, .stSlider {{
+            background-color: {CARD_DARK} !important;
+            border-radius: 8px !important;
+        }}
+        
+        /* Header and Titles */
+        h1, h2, h3, h4 {{
+            color: {TEXT_LIGHT};
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }}
+        
+        .hero-section {{
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 2.5rem 2rem;
+            border-radius: 16px;
+            border: 1px solid {BORDER_DARK};
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }}
+        
+        .hero-section::after {{
+            content: "";
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            background-image: radial-gradient(circle at 2px 2px, rgba(56, 189, 248, 0.05) 1px, transparent 0);
+            background-size: 24px 24px;
+        }}
+        
+        .hero-title {{
+            font-size: 2.2rem;
+            margin: 0;
+            color: {TEXT_LIGHT} !important;
+        }}
+        
+        .hero-subtitle {{
+            font-size: 1rem;
+            color: {TEXT_DIM};
+            margin-top: 0.5rem;
+        }}
+        
+        /* Buttons */
+        .stButton>button {{
+            background-color: {ACCENT_CYAN} !important;
+            color: {BG_DARK} !important;
+            border-radius: 8px !important;
+            border: none !important;
+            padding: 0.6rem 1.2rem !important;
+            font-weight: 700 !important;
+            transition: all 0.2s ease !important;
+            width: 100%;
+        }}
+        
+        .stButton>button:hover {{
+            background-color: {ACCENT_AMBER} !important;
+            transform: scale(1.02);
+        }}
+        
+        /* Dataframes & Tables */
+        .stDataFrame {{
+            background-color: {CARD_DARK};
+            border-radius: 12px;
+            border: 1px solid {BORDER_DARK};
+        }}
+        
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {{
+            gap: 24px;
+            background-color: transparent;
+        }}
+        
+        .stTabs [data-baseweb="tab"] {{
+            height: 50px;
+            white-space: pre-wrap;
+            background-color: transparent;
+            border-radius: 4px 4px 0px 0px;
+            gap: 1px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            color: {TEXT_DIM};
+        }}
+
+        .stTabs [aria-selected="true"] {{
+            color: {ACCENT_CYAN} !important;
+            border-bottom-color: {ACCENT_CYAN} !important;
+        }}
+        
+        /* Mono fonts */
+        code, .mono {{
+            font-family: 'Roboto Mono', monospace !important;
+            color: {ACCENT_AMBER};
+        }}
+
+        hr {{
+            border-color: {BORDER_DARK} !important;
+        }}
+        
     </style>
     """,
     unsafe_allow_html=True,
@@ -61,212 +225,158 @@ def load_config():
 
 cfg = load_config()
 
-cycle_keys = list(cfg['cycles'].keys()) if cfg['cycles'] else ["rankine"]
-selected_cycle_key = st.sidebar.selectbox(
-    "Architecture",
-    options=cycle_keys,
-    format_func=lambda key: cfg['cycles'][key]['name'] if key in cfg['cycles'] else key.title(),
-    index=0,
+# --- SIDEBAR CONTROLS ---
+with st.sidebar:
+    st.markdown(f"<h2 style='color: {ACCENT_CYAN}; margin-bottom: 0;'>THERMO</h2><h4 style='margin-top: 0; color: {TEXT_DIM};'>Cycle Explorer Pro</h4>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    cycle_keys = list(cfg['cycles'].keys()) if cfg['cycles'] else ["rankine"]
+    selected_cycle_key = st.selectbox(
+        "Cycle Architecture",
+        options=cycle_keys,
+        format_func=lambda key: cfg['cycles'][key]['name'] if key in cfg['cycles'] else key.title(),
+        index=0,
+    )
+    cycle_definition = cfg['cycles'].get(selected_cycle_key, {})
+
+    available_fluids = [
+        name for name, data in cfg['fluids'].items()
+        if selected_cycle_key in data.get('common_cycles', [])
+    ]
+    if not available_fluids:
+        available_fluids = list(cfg['fluids'].keys())
+
+    fluid = st.selectbox("Working Fluid", options=available_fluids)
+
+    st.markdown("### 📐 Thermodynamic Spec")
+    available_vars = CycleControl.get_variables_for_cycle(selected_cycle_key)
+    selected_vars = st.multiselect(
+        "Active Constraints",
+        options=available_vars,
+        default=available_vars[:2] if len(available_vars) >= 2 else [],
+        format_func=lambda x: f"{CycleControl.get_metadata(x).get('label', x)}",
+        help="Pick exactly two independent properties."
+    )
+
+    is_valid, error_msg = CycleControl.validate_selection(selected_vars)
+    if not is_valid:
+        st.error(f"⚠️ {error_msg}")
+        solve_disabled = True
+    else:
+        solve_disabled = False
+
+    params = {}
+    for var_key in selected_vars:
+        meta = CycleControl.get_metadata(var_key)
+        params[var_key] = st.number_input(
+            f"{meta['label']} ({meta['unit']})",
+            min_value=float(meta['min']),
+            max_value=float(meta['max']),
+            value=float(meta['default']),
+            step=0.1,
+            key=f"input_{var_key}"
+        )
+
+    st.markdown("### ⚙️ Component Configuration")
+    if selected_cycle_key == 'rankine':
+        params['n_rh'] = st.number_input("Reheat Stages", 0, 10, cycle_definition.get('defaults', {}).get('n_rh', 1))
+        params['n_fwh'] = st.number_input("Feedwater Heaters", 0, 10, cycle_definition.get('defaults', {}).get('n_fwh', 2))
+    elif selected_cycle_key == 'brayton':
+        params['n_ic'] = st.number_input("Intercooler Stages", 0, 5, cycle_definition.get('defaults', {}).get('n_ic', 1))
+        params['n_rh'] = st.number_input("Reheat Stages", 0, 5, cycle_definition.get('defaults', {}).get('n_rh', 0))
+    elif selected_cycle_key == 'sco2':
+        params['split_frac'] = st.slider("Split Fraction", 0.05, 0.60, 0.35)
+        params['recup_eff'] = st.slider("Recup Effectiveness", 0.5, 0.99, 0.95)
+    
+    with st.expander("ℹ️ Help & Documentation"):
+        st.markdown("""
+        **Getting Started**
+        1. Select a **Cycle Architecture**.
+        2. Pick **TWO** independent variables.
+        3. Click **RUN ANALYSIS**.
+        """)
+    
+    st.markdown("---")
+    execute_btn = st.button("🚀 RUN ANALYSIS", type="primary", disabled=solve_disabled)
+
+# --- MAIN CONTENT ---
+st.markdown(
+    f"""
+    <div class="hero-section">
+        <h1 class="hero-title">{cycle_definition.get('name', selected_cycle_key.title())}</h1>
+        <p class="hero-subtitle">High-fidelity thermodynamic simulation and performance analysis.</p>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
-cycle_definition = cfg['cycles'].get(selected_cycle_key, {})
 
-available_fluids = [
-    name for name, data in cfg['fluids'].items()
-    if selected_cycle_key in data.get('common_cycles', [])
-]
-if not available_fluids:
-    available_fluids = list(cfg['fluids'].keys())
-
-fluid = st.sidebar.selectbox("Working Fluid", options=available_fluids)
-
-st.sidebar.subheader("📐 Thermodynamic Spec")
-st.sidebar.caption("Select exactly two independent variables.")
-
-vars_meta = {
-    'P_max': {'label': 'Max Pressure (MPa)', 'min': 0.1, 'max': 35.0, 'val': 15.0, 'step': 0.5},
-    'T_max': {'label': 'Max Temperature (°C)', 'min': 100, 'max': 750, 'val': 550, 'step': 10},
-    'P_min': {'label': 'Min Pressure (MPa)', 'min': 0.001, 'max': 1.0, 'val': 0.01, 'step': 0.001},
-    'T_min': {'label': 'Min Temperature (°C)', 'min': 10, 'max': 100, 'val': 35, 'step': 1},
-}
-
-if "sco2" in selected_cycle_key:
-    vars_meta['P_min'] = {'label': 'Min Pressure (MPa)', 'min': 7.4, 'max': 10.0, 'val': 7.6, 'step': 0.05}
-    vars_meta['P_max'] = {'label': 'Max Pressure (MPa)', 'min': 10.0, 'max': 35.0, 'val': 25.0, 'step': 0.5}
-
-selected_vars = st.sidebar.multiselect(
-    "Independent variables",
-    options=list(vars_meta.keys()),
-    default=["P_max", "T_max"],
-    help="Pick exactly two independent state variables for the cycle solver.",
-)
-
-if len(selected_vars) != 2:
-    st.sidebar.error("Please select exactly two independent variables.")
-    solve_disabled = True
-else:
-    solve_disabled = False
-
-params = {key: float(meta['val']) for key, meta in vars_meta.items()}
-for selected_var in selected_vars:
-    meta = vars_meta[selected_var]
-    params[selected_var] = st.sidebar.number_input(
-        meta['label'],
-        min_value=float(meta['min']),
-        max_value=float(meta['max']),
-        value=float(meta['val']),
-        step=float(meta['step']),
-        key=f"num_{selected_var}",
-    )
-
-if selected_cycle_key == 'rankine':
-    params['n_rh'] = st.sidebar.number_input(
-        "Reheat Stages",
-        min_value=0,
-        max_value=10,
-        value=cycle_definition.get('defaults', {}).get('n_rh', 1),
-        step=1,
-    )
-    params['n_fwh'] = st.sidebar.number_input(
-        "Feedwater Heaters",
-        min_value=0,
-        max_value=10,
-        value=cycle_definition.get('defaults', {}).get('n_fwh', 2),
-        step=1,
-    )
-elif selected_cycle_key == 'brayton':
-    params['n_ic'] = st.sidebar.number_input(
-        "Intercooler Stages",
-        min_value=0,
-        max_value=5,
-        value=cycle_definition.get('defaults', {}).get('n_ic', 1),
-        step=1,
-    )
-    params['n_rh'] = st.sidebar.number_input(
-        "Reheat Stages",
-        min_value=0,
-        max_value=5,
-        value=cycle_definition.get('defaults', {}).get('n_rh', 0),
-        step=1,
-    )
-elif selected_cycle_key == 'sco2':
-    params['split_frac'] = st.sidebar.slider(
-        "Recompression Split Fraction",
-        min_value=0.05,
-        max_value=0.60,
-        value=cycle_definition.get('defaults', {}).get('split_frac', 0.35),
-        step=0.01,
-    )
-    params['recup_eff'] = st.sidebar.slider(
-        "Recuperator Effectiveness",
-        min_value=0.5,
-        max_value=0.99,
-        value=cycle_definition.get('defaults', {}).get('recup_eff', 0.95),
-        step=0.01,
-    )
-    params['eta_c'] = st.sidebar.slider(
-        "Compressor Efficiency",
-        min_value=0.7,
-        max_value=0.95,
-        value=cycle_definition.get('defaults', {}).get('eta_c', 0.89),
-        step=0.01,
-    )
-    params['eta_t'] = st.sidebar.slider(
-        "Turbine Efficiency",
-        min_value=0.7,
-        max_value=0.95,
-        value=cycle_definition.get('defaults', {}).get('eta_t', 0.92),
-        step=0.01,
-    )
-
-heat_source_options = list(cfg['heat_sources'].keys())
-if heat_source_options:
-    params['heat_source'] = st.sidebar.selectbox("Primary Heat Source", heat_source_options)
-
-cycle_factory = {
-    'rankine': RankineCycle,
-    'sco2': sCO2Cycle,
-    'brayton': BraytonCycle,
-    'otto': OttoCycle,
-    'diesel': DieselCycle,
-    'stirling': StirlingCycle,
-    'ericsson': EricssonCycle,
-}
-
-st.title(f"📊 {cycle_definition.get('name', selected_cycle_key.title())} Analysis Dashboard")
-
-if st.sidebar.button("🚀 EXECUTE SIMULATION", type="primary", use_container_width=True, disabled=solve_disabled):
+if execute_btn:
     try:
+        cycle_factory = {
+            'rankine': RankineCycle,
+            'sco2': sCO2Cycle,
+            'brayton': BraytonCycle,
+            'otto': OttoCycle,
+            'diesel': DieselCycle,
+            'stirling': StirlingCycle,
+            'ericsson': EricssonCycle,
+        }
+        
         cycle_cls = cycle_factory.get(selected_cycle_key)
-        if cycle_cls is None:
-            raise ValueError(f"Unsupported cycle: {selected_cycle_key}")
-
         cycle_obj = cycle_cls() if selected_cycle_key == 'sco2' else cycle_cls(fluid)
-        validation_messages = cycle_obj.validate_inputs(params)
-        for message in validation_messages:
-            st.warning(message)
-
-        with st.spinner("Processing thermodynamic state properties..."):
-            states = cycle_obj.solve(params)
+        
+        with st.spinner("Processing thermodynamic states..."):
+            states = cycle_obj.solve_with_targets(params)
             metrics = cycle_obj.calculate_performance()
 
-        if not states:
-            st.error("Cycle solver returned no state points.")
-        else:
-            st.subheader("🔗 System Architecture Flow-Chart")
-            svg_buf = FlowChartGenerator.create_diagram(
-                cycle_definition.get('name', selected_cycle_key.title()),
-                cycle_obj.get_component_list(),
-                states,
-            )
-            svg_bytes = svg_buf.getvalue()
-            b64 = base64.b64encode(svg_bytes).decode('utf-8')
-            st.markdown(
-                f'<div style="background-color: white; padding: 10px; border-radius: 5px; overflow-x: auto;"><img src="data:image/svg+xml;base64,{b64}"/></div>',
-                unsafe_allow_html=True,
-            )
+        # Metrics Row
+        st.markdown("### 🏁 Performance Dashboard")
+        c1, c2, c3, c4 = st.columns(4)
+        eff = metrics.get('efficiency', 0.0)
+        c1.metric("Thermal Efficiency", f"{eff:.2f}%", f"{eff-42:.1f}% vs Target")
+        c2.metric("2nd Law Eff.", f"{metrics.get('second_law_efficiency', 0.0):.1f}%")
+        c3.metric("Net Work Output", f"{metrics.get('w_net', 0.0):.1f} kJ/kg")
+        c4.metric("Entropy Gen", f"{metrics.get('s_gen', 0.0):.4f} J/kg·K")
 
-            st.subheader("📈 Thermodynamic Correlation Diagrams")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.plotly_chart(TSDiagram.create_plot(states, cycle_definition.get('name', selected_cycle_key.title()), fluid), use_container_width=True)
-            with c2:
-                st.plotly_chart(PVDiagram.create_plot(states, cycle_definition.get('name', selected_cycle_key.title()), fluid), use_container_width=True)
+        # Visualization Tabs
+        st.markdown("---")
+        t1, t2, t3 = st.tabs(["🏗️ Schematic", "📈 T-s Diagram", "📉 P-v Diagram"])
+        
+        with t1:
+            svg_buf = FlowChartGenerator.create_diagram(cycle_definition.get('name', selected_cycle_key.title()), cycle_obj.get_component_list(), states)
+            b64 = base64.b64encode(svg_buf.getvalue()).decode('utf-8')
+            st.markdown(f'<div style="background-color: white; padding: 20px; border-radius: 12px; display: flex; justify-content: center;"><img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; height: auto;"/></div>', unsafe_allow_html=True)
 
-            st.subheader("📝 State Point Analytics")
-            state_rows = []
-            for sid, state_obj in states.items():
-                row = state_obj.to_dict()
-                row['Point'] = sid
-                row['T (°C)'] = f"{row['T'] - 273.15:.2f}" if row['T'] else None
-                row['P (MPa)'] = f"{row['P'] / 1e6:.3f}" if row['P'] else None
-                row['h (kJ/kg)'] = f"{row['h'] / 1000:.1f}" if row['h'] else None
-                row['s (kJ/kg·K)'] = f"{row['s'] / 1000:.3f}" if row['s'] else None
-                state_rows.append(row)
-            st.dataframe(state_rows, use_container_width=True)
+        with t2:
+            st.plotly_chart(TSDiagram.create_plot(states, cycle_definition.get('name', selected_cycle_key.title()), fluid), use_container_width=True)
+        
+        with t3:
+            st.plotly_chart(PVDiagram.create_plot(states, cycle_definition.get('name', selected_cycle_key.title()), fluid), use_container_width=True)
 
-            metric_cols = st.columns(4)
-            efficiency = metrics.get('efficiency', 0.0)
-            metric_cols[0].metric("Thermal Efficiency", f"{efficiency:.2f}%", delta=f"{efficiency - 42:.1f}% vs Target")
-            metric_cols[1].metric("Second-Law Efficiency", f"{metrics.get('second_law_efficiency', 0.0):.2f}%")
-            metric_cols[2].metric("Entropy Generation", f"{metrics.get('s_gen', 0.0):.4f} J/kg·K")
-            metric_cols[3].metric("Net Work", f"{metrics.get('w_net', 0.0):.1f} kJ/kg")
-
-            extra_cols = st.columns(3)
-            extra_cols[0].metric("Heat Input", f"{metrics.get('q_in', 0.0):.1f} kJ/kg")
-            extra_cols[1].metric("Heat Rejection", f"{metrics.get('q_out', 0.0):.1f} kJ/kg")
-            extra_cols[2].metric("Working Fluid", fluid)
-
-            if efficiency >= 42.0:
-                st.success("✅ Target ≥42% Met")
-            else:
-                st.info("⚠️ Below the 42% efficiency target")
+        # State Point Table
+        st.markdown("---")
+        st.markdown("### 📝 Detailed State Point Analytics")
+        state_rows = []
+        for sid, st_obj in states.items():
+            row = st_obj.to_dict()
+            row['Point'] = sid
+            row['T (°C)'] = f"{row['T'] - 273.15:.2f}"
+            row['P (MPa)'] = f"{row['P'] / 1e6:.3f}"
+            row['h (kJ/kg)'] = f"{row['h'] / 1000:.1f}"
+            row['s (kJ/kg·K)'] = f"{row['s'] / 1000:.3f}"
+            state_rows.append(row)
+        st.dataframe(state_rows, use_container_width=True)
 
     except Exception as exc:
         logger.exception("Cycle execution failed")
         st.error(f"Solver Failure: {exc}")
 else:
-    st.info("👈 Use the sidebar to define the cycle specification and click EXECUTE SIMULATION.")
-    st.image(
-        "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/T-s_Rankine_cycle.svg/1024px-T-s_Rankine_cycle.svg.png",
-        width=600,
+    st.info("💡 Define your cycle constraints in the sidebar and click **RUN ANALYSIS** to begin.")
+    st.markdown(
+        f"""
+        <div style="background-color: {CARD_DARK}; padding: 30px; border-radius: 12px; border: 1px solid {BORDER_DARK}; text-align: center;">
+            <p style="color: {TEXT_DIM}; font-size: 1.2rem;">Ready for simulation. Select a cycle architecture to view theoretical schematics.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
     )

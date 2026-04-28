@@ -11,10 +11,25 @@ class StirlingCycle(BaseCycle):
         
     def solve(self, params):
         self.clear_states()
-        T_hot = params['T_max'] + 273.15
-        T_cold = params['T_min'] + 273.15
-        P_max = params['P_max'] * 1e6
-        r = params.get('r', 2.0)
+        
+        # Mapping UI keys and providing defaults
+        defaults = {
+            'T_max': 800.0 + 273.15,
+            'T_min': 25.0 + 273.15,
+            'P_max': 10.0 * 1e6,
+            'r': 2.0,
+        }
+        
+        current = defaults.copy()
+        if 'T_max' in params: current['T_max'] = params['T_max'] + 273.15
+        if 'T_min' in params: current['T_min'] = params['T_min'] + 273.15
+        if 'P_max' in params: current['P_max'] = params['P_max'] * 1e6
+        if 'r' in params: current['r'] = params['r']
+        
+        T_hot = current['T_max']
+        T_cold = current['T_min']
+        P_max = current['P_max']
+        r = current['r']
         
         self.states[3] = self.get_state('P', P_max, 'T', T_hot, "Heating Exit")
         
@@ -53,9 +68,13 @@ class StirlingCycle(BaseCycle):
 
     def validate_inputs(self, params):
         errors = []
-        if params['T_max'] <= params['T_min']:
+        t_max = params.get('T_max', 800.0)
+        t_min = params.get('T_min', 25.0)
+        r = params.get('r', 2.0)
+        
+        if t_max <= t_min:
             errors.append("T_max must be greater than T_min.")
-        if params['r'] <= 1:
+        if r <= 1:
             errors.append("Expansion ratio must be greater than 1.")
         return errors
 
