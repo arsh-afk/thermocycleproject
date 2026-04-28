@@ -1,0 +1,37 @@
+[project]
+name = "thermocycleproject"
+version = "0.1.0"
+description = "Thermodynamic cycle modeling, analysis, and visualization for engineering education."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["thermodynamics", "cycle", "CoolProp", "streamlit", "energy"]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "coolprop>=6.4.1",
+    "PyYAML>=6.0",
+    "streamlit>=1.32.0",
+    "plotly>=5.18.0",
+    "matplotlib>=3.8.0",
+    "numpy>=1.26.0",
+    "scipy>=1.12.0",
+    "pandas>=2.2.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "black>=24.0",
+    "flake8>=7.0"
+]
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["find:"]

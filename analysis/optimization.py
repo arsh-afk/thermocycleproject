@@ -10,13 +10,14 @@ class CycleOptimizer:
     
     def optimize_efficiency(self, cycle_obj, initial_params, param_bounds, constraints=None):
         """
-        Maximizes cycle efficiency by minimizing (-efficiency).
+        Maximizes cycle efficiency by minimizing the negative efficiency.
         """
-        def objective(x):
-            # Map x back to params dict
-            # This requires a standard mapping between cycle_obj and optimizer
-            return -45.0 # Placeholder
-            
-        # res = minimize(objective, initial_params, bounds=param_bounds, method='SLSQP')
-        # return res
-        pass
+        def objective(x_values):
+            params = {name: value for name, value in zip(initial_params.keys(), x_values)}
+            cycle_obj.solve(params)
+            metrics = cycle_obj.calculate_performance()
+            return -metrics.get('efficiency', 0)
+
+        x0 = [initial_params[name] for name in initial_params]
+        result = minimize(objective, x0, bounds=param_bounds, constraints=constraints or [], method='SLSQP')
+        return result

@@ -3,9 +3,12 @@ P-v Diagram Visualization Module
 Educational note: Pressure-Volume diagrams are fundamental for understanding work (integral of Pdv).
 SOURCE: Standard thermodynamic plot conventions.
 """
+import logging
 import plotly.graph_objects as go
 import numpy as np
 import CoolProp.CoolProp as CP
+
+logger = logging.getLogger(__name__)
 
 class PVDiagram:
     """Generates interactive P-v diagrams with saturation curves."""
@@ -31,8 +34,8 @@ class PVDiagram:
                 line=dict(color='rgba(255, 165, 0, 0.3)', dash='dash', width=1),
                 name=f'{fluid_name} Saturation Dome'
             ))
-        except:
-            pass
+        except Exception as exc:
+            logger.debug("Unable to plot P-v saturation dome for %s: %s", fluid_name, exc)
 
         # 2. Plot Cycle Path
         sorted_keys = sorted(states.keys())

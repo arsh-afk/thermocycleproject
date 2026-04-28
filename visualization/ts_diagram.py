@@ -3,9 +3,12 @@ T-s Diagram Visualization Module
 Educational note: Temperature-Entropy diagrams visualize heat addition (integral of Tds)
 and isentropic processes (vertical lines).
 """
+import logging
 import plotly.graph_objects as go
 import numpy as np
 import CoolProp.CoolProp as CP
+
+logger = logging.getLogger(__name__)
 
 class TSDiagram:
     """Generates interactive T-s diagrams with saturation domes."""
@@ -25,20 +28,14 @@ class TSDiagram:
             s_vap = [CP.PropsSI('S', 'T', t, 'Q', 1, fluid_name)/1000 for t in T_range]
             T_c = [t - 273.15 for t in T_range]
             
-            # Pure Water Reference Dome (Dashed Grey) if cycle is Rankine and fluid is not water
-            if "Rankine" in cycle_name and fluid_name != "Water":
-                # SOURCE: IAPWS-IF97 Reference for context
-                # Plot standard water dome for student comparison
-                pass
-                
             fig.add_trace(go.Scatter(
                 x=s_liq + s_vap[::-1], y=T_c + T_c[::-1],
                 fill='toself', fillcolor='rgba(100, 100, 100, 0.1)',
                 line=dict(color='rgba(150, 150, 150, 0.5)', dash='dash', width=1),
                 name=f'{fluid_name} Saturation Dome'
             ))
-        except:
-            pass # Non-condensable gas or CoolProp error
+        except Exception as exc:
+            logger.debug("Unable to plot saturation dome for %s: %s", fluid_name, exc)
 
         # 2. Plot Cycle Path
         # Handle N-states sequentially

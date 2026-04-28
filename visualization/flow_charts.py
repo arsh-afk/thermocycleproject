@@ -23,6 +23,32 @@ class FlowChartGenerator:
         'default': "#333333"
     }
 
+    COMPONENT_DRAWERS = {
+        "Turbine": lambda ax, x, y: FlowChartGenerator.draw_turbine(ax, x, y),
+        "Turbines": lambda ax, x, y: FlowChartGenerator.draw_turbine(ax, x, y),
+        "Compressor": lambda ax, x, y: FlowChartGenerator.draw_compressor(ax, x, y),
+        "Compressors": lambda ax, x, y: FlowChartGenerator.draw_compressor(ax, x, y),
+        "Main Comp": lambda ax, x, y: FlowChartGenerator.draw_compressor(ax, x, y),
+        "Recompressor": lambda ax, x, y: FlowChartGenerator.draw_compressor(ax, x, y),
+        "Recomp Comp": lambda ax, x, y: FlowChartGenerator.draw_compressor(ax, x, y),
+        "Pump": lambda ax, x, y: FlowChartGenerator.draw_pump(ax, x, y),
+        "Pumps": lambda ax, x, y: FlowChartGenerator.draw_pump(ax, x, y),
+        "Boiler": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "BOILER", "#ffebee"),
+        "Condenser": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "CONDENSER", "#e3f2fd"),
+        "Heat Exchanger": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "HX", "#fff8e1"),
+        "LTR": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "LTR", "#e8f5e8"),
+        "HTR": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "HTR", "#f3e5f5"),
+        "Primary Heater": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "HEATER", "#fff3e0"),
+        "Regeneration": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "REGEN", "#fce4ec"),
+        "Isothermal Compression": lambda ax, x, y: FlowChartGenerator.draw_compressor(ax, x, y),
+        "Isothermal Expansion": lambda ax, x, y: FlowChartGenerator.draw_turbine(ax, x, y),
+        "Combustor": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "COMB", "#ffcc80"),
+        "Intercoolers": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "IC", "#b3e5fc"),
+        "Reheaters": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "RH", "#c8e6c9"),
+        # Default for unknown
+        "default": lambda ax, x, y: FlowChartGenerator.draw_exchanger(ax, x, y, "COMP", "#f5f5f5"),
+    }
+
     @staticmethod
     def get_phase_color(state):
         """Determines line color based on thermodynamic state."""
@@ -71,74 +97,62 @@ class FlowChartGenerator:
     @staticmethod
     def create_diagram(cycle_type, component_list, states):
         """
-        Procedurally maps states to components and draws the loop.
+        Procedurally maps components and states for cycle-specific diagrams.
+        component_list: list of component names in order.
         states: dict of state_id: ThermodynamicState
         """
-        # Determine scaling based on component count
-        n = len(states)
-        fig, ax = plt.subplots(figsize=(12, 7), dpi=150)
-        ax.set_xlim(0, 100); ax.set_ylim(0, 60)
+        fig, ax = plt.subplots(figsize=(14, 8), dpi=200, facecolor='#f9f9f9')
+        ax.set_xlim(0, 100)
+        ax.set_ylim(0, 60)
         ax.axis('off')
 
-        # SOURCE: Topology Mapping
-        # Standard power loop layout logic
-        # 1. Heating (Left) 2. Expansion (Top) 3. Cooling (Right) 4. Compression (Bottom)
-        
-        # We classify states based on P and T trends to assign coordinates
-        # Simplified: Use standard clockwise mapping for N components
-        sorted_keys = sorted(states.keys())
-        n_pts = len(sorted_keys)
-        
-        # Calculate ellipse/rectangle coordinates
-        t = np.linspace(0, 2*np.pi, n_pts, endpoint=False)
-        # Flip to clockwise starting from bottom left
-        t = -t + np.pi*1.2
-        coords = {k: (50 + 35*np.cos(ti), 30 + 20*np.sin(ti)) for k, ti in zip(sorted_keys, t)}
+        n_comp = len(component_list)
+        n_states = len(states)
+        sorted_states = sorted(states.keys())
 
-        # Draw Components and Lines
-        for i in range(n_pts):
-            k1 = sorted_keys[i]
-            k2 = sorted_keys[(i + 1) % n_pts]
-            p1, p2 = coords[k1], coords[k2]
-            st1, st2 = states[k1], states[k2]
-            
-            # 1. Determine Component Type based on P, T changes
-            mx, my = (p1[0]+p2[0])/2, (p1[1]+p2[1])/2
-            
-            # Logic: P increase -> Pump/Comp, T increase -> Boiler/Heat
-            if st2.P > st1.P * 1.1:
-                if st1.x == 0 or st1.phase_label == "Liquid":
-                    FlowChartGenerator.draw_pump(ax, mx, my)
-                else:
-                    FlowChartGenerator.draw_compressor(ax, mx, my)
-            elif st2.h < st1.h * 0.9:
-                FlowChartGenerator.draw_turbine(ax, mx, my)
-            elif st2.T > st1.T + 10:
-                FlowChartGenerator.draw_exchanger(ax, mx, my, "HEAT ADD", "#ffebee")
-            elif st2.T < st1.T - 10:
-                FlowChartGenerator.draw_exchanger(ax, mx, my, "COOLER", "#e3f2fd")
+        # Position components in a cycle: start from bottom-left, clockwise
+        angles = np.linspace(np.pi/2, -3*np.pi/2, n_comp, endpoint=False)  # Start at top, go clockwise
+        comp_positions = [(50 + 35*np.cos(a), 30 + 20*np.sin(a)) for a in angles]
 
-            # 2. Draw Flow Line with Phase Coloring
-            color = FlowChartGenerator.get_phase_color(st1)
-            ax.annotate('', xy=p2, xytext=p1,
-                        arrowprops=dict(arrowstyle='-|>,head_width=0.3,head_length=0.5', 
-                                      color=color, lw=2.5, shrinkA=5, shrinkB=5))
+        # Position state points midway between components
+        state_angles = np.linspace(np.pi/2, -3*np.pi/2, n_states, endpoint=False)
+        state_positions = [(50 + 40*np.cos(a), 30 + 25*np.sin(a)) for a in state_angles]
 
-            # 3. Draw State Anchor (Circle)
-            # Positioned at the START of each component inlet
-            circ = patches.Circle(p1, 2.0, fc="white", ec="#333333", lw=1, zorder=5)
+        # Draw components
+        for i, comp in enumerate(component_list):
+            x, y = comp_positions[i]
+            drawer = FlowChartGenerator.COMPONENT_DRAWERS.get(comp, FlowChartGenerator.COMPONENT_DRAWERS["default"])
+            drawer(ax, x, y)
+
+        # Draw state points and connections
+        for i, state_id in enumerate(sorted_states):
+            st = states[state_id]
+            p = state_positions[i]
+
+            # Draw state anchor
+            circ = patches.Circle(p, 2.5, fc="white", ec="#333333", lw=1.5, zorder=5)
             ax.add_patch(circ)
-            ax.text(p1[0], p1[1], str(k1), ha='center', va='center', fontsize=8, fontweight='bold')
+            ax.text(p[0], p[1], str(state_id), ha='center', va='center', fontsize=9, fontweight='bold', color='#333')
 
-        # Title Block
-        ax.text(50, 58, f"{cycle_type} - Procedural Flow Schematic", ha='center', fontweight='bold', fontsize=12)
-        
-        # Legend
-        lax = fig.add_axes([0.8, 0.05, 0.15, 0.15])
+            # Draw flow arrow to next state
+            next_i = (i + 1) % n_states
+            next_p = state_positions[next_i]
+            color = FlowChartGenerator.get_phase_color(st)
+            ax.annotate('', xy=next_p, xytext=p,
+                        arrowprops=dict(arrowstyle='-|>,head_width=0.4,head_length=0.6', 
+                                      color=color, lw=3, shrinkA=8, shrinkB=8))
+
+        # Title
+        ax.text(50, 58, f"{cycle_type} - Flow Schematic", ha='center', fontweight='bold', fontsize=14, color='#333')
+
+        # Enhanced Legend
+        lax = fig.add_axes([0.75, 0.05, 0.2, 0.25])
         lax.axis('off')
-        lax.text(0, 0.8, "─ Vapor/Steam", color=FlowChartGenerator.PHASE_COLORS['vapor'], fontsize=7, fontweight='bold')
-        lax.text(0, 0.5, "─ Liquid Phase", color=FlowChartGenerator.PHASE_COLORS['liquid'], fontsize=7, fontweight='bold')
-        lax.text(0, 0.2, "─ Supercritical", color=FlowChartGenerator.PHASE_COLORS['supercritical'], fontsize=7, fontweight='bold')
+        lax.text(0, 0.9, "Phases:", fontsize=10, fontweight='bold', color='#333')
+        lax.text(0, 0.7, "─ Vapor/Steam", color=FlowChartGenerator.PHASE_COLORS['vapor'], fontsize=8)
+        lax.text(0, 0.5, "─ Liquid", color=FlowChartGenerator.PHASE_COLORS['liquid'], fontsize=8)
+        lax.text(0, 0.3, "─ Supercritical", color=FlowChartGenerator.PHASE_COLORS['supercritical'], fontsize=8)
+        lax.text(0, 0.1, "─ Two-Phase", color=FlowChartGenerator.PHASE_COLORS['two-phase'], fontsize=8)
 
         buf = io.BytesIO()
         plt.savefig(buf, format='svg', bbox_inches='tight', transparent=True)
