@@ -394,6 +394,34 @@ class FlowChartGenerator:
             next_id = sorted_states[(i + 1) % len(sorted_states)]
             connections.append((current_id, next_id, ""))
         
+        # Add state annotations with thermodynamic properties
+        for state_id, st in states.items():
+            if state_id in positions['states']:
+                x, y = positions['states'][state_id]
+                temp = f"{st.T - 273.15:.0f}°C" if st.T else ""
+                press = f"{st.P / 1e5:.1f}bar" if st.P else ""
+                info = f"{temp}\n{press}".strip()
+                if info:
+                    annotations.append(((x, y - 7), info, '#666'))
+        
+        # Add process annotations
+        for i in range(len(sorted_states)):
+            current_id = sorted_states[i]
+            next_id = sorted_states[(i + 1) % len(sorted_states)]
+            if current_id in positions['states'] and next_id in positions['states']:
+                current_st = states[current_id]
+                next_st = states[next_id]
+                delta_u = next_st.u - current_st.u if next_st.u and current_st.u else 0
+                annotation_pos = (positions['states'][current_id][0] + 4, positions['states'][current_id][1] + 4)
+                if i == 0:  # Compression
+                    annotations.append((annotation_pos, f"W_c={abs(delta_u)/1000:.0f}kJ/kg", '#DC143C'))
+                elif i == 1:  # Heat addition
+                    annotations.append((annotation_pos, f"Q_in={abs(delta_u)/1000:.0f}kJ/kg", '#FF6347'))
+                elif i == 2:  # Expansion
+                    annotations.append((annotation_pos, f"W_e={abs(delta_u)/1000:.0f}kJ/kg", '#2E8B57'))
+                elif i == 3:  # Heat rejection
+                    annotations.append((annotation_pos, f"Q_out={abs(delta_u)/1000:.0f}kJ/kg", '#4169E1'))
+        
         return positions, connections, annotations
 
     @staticmethod
@@ -403,7 +431,7 @@ class FlowChartGenerator:
 
     @staticmethod
     def layout_stirling(comps, states):
-        """Stirling cycle layout"""
+        """Stirling cycle layout - isothermal compression and expansion"""
         positions = {'components': {}, 'states': {}}
         connections = []
         annotations = []
@@ -430,6 +458,34 @@ class FlowChartGenerator:
             current_id = sorted_states[i]
             next_id = sorted_states[(i + 1) % len(sorted_states)]
             connections.append((current_id, next_id, ""))
+        
+        # Add state annotations
+        for state_id, st in states.items():
+            if state_id in positions['states']:
+                x, y = positions['states'][state_id]
+                temp = f"{st.T - 273.15:.0f}°C" if st.T else ""
+                press = f"{st.P / 1e5:.1f}bar" if st.P else ""
+                info = f"{temp}\n{press}".strip()
+                if info:
+                    annotations.append(((x, y - 7), info, '#666'))
+        
+        # Add process annotations
+        for i in range(len(sorted_states)):
+            current_id = sorted_states[i]
+            next_id = sorted_states[(i + 1) % len(sorted_states)]
+            if current_id in positions['states'] and next_id in positions['states']:
+                current_st = states[current_id]
+                next_st = states[next_id]
+                delta_h = next_st.h - current_st.h if next_st.h and current_st.h else 0
+                annotation_pos = (positions['states'][current_id][0] + 4, positions['states'][current_id][1] + 4)
+                if i == 0:  # Isothermal compression
+                    annotations.append((annotation_pos, f"W_c={abs(delta_h)/1000:.0f}kJ/kg", '#DC143C'))
+                elif i == 1:  # Isothermal heating
+                    annotations.append((annotation_pos, f"Q_in={abs(delta_h)/1000:.0f}kJ/kg", '#FF6347'))
+                elif i == 2:  # Isothermal expansion
+                    annotations.append((annotation_pos, f"W_e={abs(delta_h)/1000:.0f}kJ/kg", '#2E8B57'))
+                elif i == 3:  # Isothermal cooling
+                    annotations.append((annotation_pos, f"Q_out={abs(delta_h)/1000:.0f}kJ/kg", '#4169E1'))
         
         return positions, connections, annotations
 
