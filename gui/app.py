@@ -343,7 +343,7 @@ if execute_btn:
         t1, t2, t3 = st.tabs(["🏗️ Schematic", "📈 T-s Diagram", "📉 P-v Diagram"])
         
         with t1:
-            svg_buf = FlowChartGenerator.create_diagram(cycle_definition.get('name', selected_cycle_key.title()), cycle_obj.get_component_list(), states)
+            svg_buf = FlowChartGenerator.create_diagram(cycle_definition.get('name', selected_cycle_key.title()), cycle_obj.get_component_list(), states, metrics)
             b64 = base64.b64encode(svg_buf.getvalue()).decode('utf-8')
             st.markdown(f'<div style="background-color: white; padding: 20px; border-radius: 12px; display: flex; justify-content: center;"><img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; height: auto;"/></div>', unsafe_allow_html=True)
 

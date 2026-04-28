@@ -39,7 +39,17 @@ class PropertyWrapper:
             rho = CP.PropsSI('D', p1, val1, p2, val2, fluid)
         except Exception as exc:
             logger.exception("CoolProp state calculation failed")
-            raise ValueError(f"Thermodynamic calculation failed for {fluid} with {p1}={val1}, {p2}={val2}: {exc}") from exc
+            limits = PropertyWrapper.get_fluid_limits(fluid)
+            limit_str = ""
+            if limits:
+                limit_str = f"\nValid ranges for {fluid}:\n"
+                for prop, (min_val, max_val) in [('T', (limits.get('T_min'), limits.get('T_max'))),
+                                                ('P', (limits.get('P_min'), limits.get('P_max'))),
+                                                ('H', (limits.get('H_min'), limits.get('H_max'))),
+                                                ('S', (limits.get('S_min'), limits.get('S_max')))]:
+                    if min_val is not None and max_val is not None:
+                        limit_str += f"  {prop}: {min_val:.2e} to {max_val:.2e}\n"
+            raise ValueError(f"Thermodynamic calculation failed for {fluid} with {p1}={val1}, {p2}={val2}: {exc}{limit_str}") from exc
 
         state = ThermodynamicState(T=T, P=P, h=h, s=s, rho=rho, v=(1.0 / rho if rho else None), note=note)
 
@@ -59,6 +69,23 @@ class PropertyWrapper:
             state.phase_label = 'Single-Phase'
 
         return state
+
+    @staticmethod
+    def get_fluid_limits(fluid):
+        """Get valid property ranges for the fluid."""
+        limits = {}
+        limit_keys = [
+            ('T_min', 'T_MIN'), ('T_max', 'T_MAX'),
+            ('P_min', 'P_MIN'), ('P_max', 'P_MAX'),
+            ('H_min', 'HMASS_MIN'), ('H_max', 'HMASS_MAX'),
+            ('S_min', 'SMASS_MIN'), ('S_max', 'SMASS_MAX'),
+        ]
+        for limit_name, cp_key in limit_keys:
+            try:
+                limits[limit_name] = CP.PropsSI(cp_key, fluid)
+            except Exception:
+                pass  # Skip if not available
+        return limits
 
     @staticmethod
     def get_fluid_constants(fluid):
