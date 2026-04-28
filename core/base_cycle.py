@@ -4,7 +4,6 @@ Educational note: All thermodynamic power cycles share common principles of heat
 work extraction, and heat rejection. This base class enforces a consistent interface.
 """
 from abc import ABC, abstractmethod
-from utils.property_wrapper import PropertyWrapper
 
 class BaseCycle(ABC):
     """Abstract interface for all cycle solvers."""
@@ -47,6 +46,7 @@ class BaseCycle(ABC):
 
     def get_state(self, prop1, val1, prop2, val2, note=""):
         """Utility to get state using cycle's fluid."""
+        from utils.property_wrapper import PropertyWrapper
         return PropertyWrapper.get_state(self.fluid, prop1, val1, prop2, val2, note)
 
     def calculate_work(self, h_in, h_out):

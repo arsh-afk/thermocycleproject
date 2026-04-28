@@ -15,6 +15,28 @@ class RankineCycle(BaseCycle):
         self.boiler = HeatExchanger("Boiler")
         self.corrections = WaterAdditives.get_corrections(additive, concentration)
 
+    def get_component_list(self):
+        # We need to return exactly the same number of components as there are state changes.
+        # Flow is: Condenser -> Pump -> FWH -> Pump -> FWH -> Boiler -> Turbine -> Reheater -> Turbine -> Condenser
+        components = []
+        n_rh = getattr(self, '_n_rh_used', 0)
+        n_fwh = getattr(self, '_n_fwh_used', 0)
+        
+        for i in range(n_fwh + 1):
+            components.append(f"Pump {i+1}")
+            if i < n_fwh:
+                components.append(f"FWH {i+1}")
+                
+        components.append("Boiler")
+        
+        for i in range(n_rh + 1):
+            components.append(f"Turbine {i+1}")
+            if i < n_rh:
+                components.append(f"Reheater {i+1}")
+                
+        components.append("Condenser")
+        return components
+
     def solve(self, params):
         self.clear_states()
         P_min = params['P_min'] * 1e6
@@ -22,6 +44,10 @@ class RankineCycle(BaseCycle):
         T_max = params['T_max'] + 273.15
         n_rh = max(0, int(params.get('n_rh', 0)))
         n_fwh = max(0, int(params.get('n_fwh', 0)))
+        
+        self._n_rh_used = n_rh
+        self._n_fwh_used = n_fwh
+        
         eta_p, eta_t = 0.85, 0.90
         self.T_hot = T_max
         self.T_cold = None
@@ -102,6 +128,3 @@ class RankineCycle(BaseCycle):
         if params.get('n_fwh', 0) < 0:
             errors.append("Feedwater heater count cannot be negative.")
         return errors
-
-    def get_component_list(self):
-        return ["Pumps", "Boiler", "Turbines", "Condenser"]

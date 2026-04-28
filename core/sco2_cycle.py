@@ -108,4 +108,19 @@ class sCO2Cycle(BaseCycle):
         return errs
 
     def get_component_list(self):
-        return ["Main Comp", "LTR", "HTR", "Primary Heater", "Turbine", "Recomp Comp"]
+        # sCO2 Recompression loop components in flow order starting from Main Comp
+        # States: 1(Main Comp In) -> 2(Main Comp Out) -> 3(LTR Cold Out) -> 4(Mixer/HTR In) -> 5(HTR Hot Out) -> 6(Turbine In) -> 7(Turbine Out) -> 8(HTR Hot Out) -> 9(Split) -> 10(Recomp Out)
+        # Sequence: Main Comp -> LTR (Cold Side) -> Mixer -> HTR (Cold Side) -> Primary Heater -> Turbine -> HTR (Hot Side) -> LTR (Hot Side) -> Cooler
+        # To match the 10 states, we need 10 components/segments.
+        return [
+            "Main Compressor",
+            "LTR (Cold)",
+            "Mixer",
+            "HTR (Cold)",
+            "Primary Heater",
+            "Turbine",
+            "HTR (Hot)",
+            "LTR (Hot)",
+            "Flow Split",
+            "Recompressor/Cooler"
+        ]

@@ -19,6 +19,26 @@ class BraytonCycle(BaseCycle):
         self.compressor = Compressor("Compressor")
         self.turbine = Turbine("Turbine")
         
+    def get_component_list(self):
+        components = []
+        n_ic = getattr(self, '_n_ic_used', 0)
+        n_rh = getattr(self, '_n_rh_used', 0)
+        
+        for i in range(n_ic + 1):
+            components.append(f"Compressor {i+1}")
+            if i < n_ic:
+                components.append(f"Intercooler {i+1}")
+                
+        components.append("Combustor")
+        
+        for i in range(n_rh + 1):
+            components.append(f"Turbine {i+1}")
+            if i < n_rh:
+                components.append(f"Reheater {i+1}")
+                
+        components.append("Cooler/Exhaust")
+        return components
+
     def solve(self, params):
         self.clear_states()
         P_min = params['P_min'] * 1e6
@@ -27,6 +47,10 @@ class BraytonCycle(BaseCycle):
         T_max = params['T_max'] + 273.15
         n_ic = max(0, int(params.get('n_ic', 0)))
         n_rh = max(0, int(params.get('n_rh', 0)))
+        
+        self._n_ic_used = n_ic
+        self._n_rh_used = n_rh
+        
         eta_c, eta_t = 0.85, 0.90
         self.T_hot = T_max
         self.T_cold = T_min
@@ -66,38 +90,3 @@ class BraytonCycle(BaseCycle):
                 self._q_in += t_in.h - st_out.h
         
         return self.states
-
-    def calculate_performance(self):
-        if not self.states:
-            return {}
-        w_net = self._w_turb - self._w_comp
-        q_in = self._q_in
-        efficiency = (w_net / q_in) * 100 if q_in > 0 else 0
-        last_state = self.states[max(self.states)]
-        q_out = last_state.h - self.states[1].h
-        s_gen = self.calculate_entropy_generation(q_in, self.T_hot, q_out, self.T_cold)
-        sl_eff = self.calculate_second_law_efficiency(efficiency, self.T_hot, self.T_cold)
-        self.metrics = {
-            'efficiency': efficiency,
-            'w_net': w_net / 1000,
-            'q_in': q_in / 1000,
-            'q_out': q_out / 1000,
-            's_gen': s_gen,
-            'second_law_efficiency': sl_eff,
-        }
-        return self.metrics
-
-    def validate_inputs(self, params):
-        errors = []
-        if params['P_min'] >= params['P_max']:
-            errors.append("P_max must be greater than P_min.")
-        if params['T_min'] >= params['T_max']:
-            errors.append("T_max must be greater than T_min.")
-        if params.get('n_ic', 0) < 0:
-            errors.append("Intercooler stages cannot be negative.")
-        if params.get('n_rh', 0) < 0:
-            errors.append("Reheat stages cannot be negative.")
-        return errors
-
-    def get_component_list(self):
-        return ["Compressors", "Intercoolers", "Combustor", "Turbines", "Reheaters"]
