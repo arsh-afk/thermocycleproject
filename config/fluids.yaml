@@ -1,0 +1,48 @@
+# Working Fluid Definitions
+# Properties are calculated using CoolProp, but these definitions set limits.
+
+Water:
+  T_crit: 647.096 # K
+  P_crit: 22.064 # MPa
+  max_T: 2000.0 # K
+  min_T: 273.16 # K
+  common_cycles: ["rankine"]
+
+Air:
+  T_crit: 132.631 # K
+  P_crit: 3.786 # MPa
+  max_T: 2000.0
+  min_T: 60.0
+  common_cycles: ["brayton", "otto", "diesel"]
+
+CO2:
+  T_crit: 304.13 # K
+  P_crit: 7.377 # MPa
+  max_T: 2000.0
+  min_T: 216.59 # K
+  common_cycles: ["sco2", "rankine", "brayton"]
+
+Ammonia:
+  T_crit: 405.4 # K
+  P_crit: 11.333 # MPa
+  common_cycles: ["rankine"]
+
+Nitrogen:
+  T_crit: 126.19
+  P_crit: 3.395
+  common_cycles: ["brayton"]
+
+Argon:
+  T_crit: 150.68
+  P_crit: 4.863
+  common_cycles: ["brayton"]
+
+Helium:
+  T_crit: 5.19
+  P_crit: 0.227
+  common_cycles: ["brayton"]
+
+R134a:
+  T_crit: 374.21
+  P_crit: 4.059
+  common_cycles: ["rankine"]

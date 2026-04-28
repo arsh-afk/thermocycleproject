@@ -1,0 +1,81 @@
+# Cycle Architectures Definition
+# Educational note: Cycles are defined by their component sequences and connection logic.
+# These YAML definitions allow adding new cycle types without changing Python logic.
+
+rankine:
+  name: "Rankine Cycle"
+  components: ["Feed Pump", "Boiler", "High Pressure Turbine", "Reheater", "Low Pressure Turbine", "Condenser"]
+  defaults:
+    P_min: 0.01 # MPa
+    P_max: 15.0 # MPa
+    T_max: 550.0 # C
+    n_rh: 1
+    n_fwh: 2
+  ranges:
+    P_min: [0.001, 0.5]
+    P_max: [1.0, 35.0]
+    T_max: [100.0, 750.0]
+
+brayton:
+  name: "Brayton Cycle"
+  components: ["Compressor", "Intercooler", "Combustor", "Turbine", "Regenerator"]
+  defaults:
+    P_min: 0.1 # MPa
+    P_max: 1.2 # MPa
+    T_min: 25.0 # C
+    T_max: 1100.0 # C
+    n_ic: 1
+    n_rh: 1
+  ranges:
+    P_min: [0.05, 1.0]
+    P_max: [0.5, 50.0]
+    T_max: [500.0, 1600.0]
+
+sco2:
+  name: "Supercritical CO2 Brayton"
+  configurations: ["simple_recuperated", "recompression", "partial_cooling"]
+  defaults:
+    configuration: "recompression"
+    P_low: 7.6 # MPa
+    P_high: 25.0 # MPa
+    T_comp_in: 32.0 # C
+    T_turb_in: 550.0 # C
+    split_frac: 0.35
+  ranges:
+    P_low: [7.38, 10.0] # Near critical is 7.377 MPa
+    P_high: [10.0, 35.0]
+    T_turb_in: [200.0, 800.0]
+
+otto:
+  name: "Otto Cycle"
+  defaults:
+    r: 8.0
+    T_max: 1500.0
+    P_min: 0.1
+    T_min: 25.0
+
+diesel:
+  name: "Diesel Cycle"
+  defaults:
+    r: 16.0
+    rc: 2.0
+    T_max: 1800.0
+    P_min: 0.1
+    T_min: 25.0
+
+stirling:
+  name: "Stirling Cycle"
+  defaults:
+    r: 2.0
+    T_hot: 800.0
+    T_cold: 25.0
+    P_max: 10.0
+
+ericsson:
+  name: "Ericsson Cycle"
+  defaults:
+    rp: 10.0
+    T_hot: 800.0
+    T_cold: 25.0
+    P_max: 10.0
+    P_min: 0.1

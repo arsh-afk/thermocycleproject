@@ -1,0 +1,32 @@
+# Heat Source Definitions
+# Defines boundary conditions for the primary heat exchanger.
+
+nuclear:
+  T_hot: 650.0 # C
+  cost_index: 0.1 # Rel. low fuel cost
+  co2_intensity: 0.012 # kg/kWh
+  description: "Next-gen Gen IV reactors (e.g., Molten Salt) providing stable high-T heat."
+
+coal:
+  T_hot: 600.0
+  cost_index: 0.3
+  co2_intensity: 0.82
+  description: "Traditional supercritical coal-fired boilers."
+
+solar_tower:
+  T_hot: 565.0
+  cost_index: 0.6
+  co2_intensity: 0.04
+  description: "Concentrated Solar Power (CSP) tower using molten salt storage."
+
+waste_heat:
+  T_hot: 200.0
+  cost_index: 0.05
+  co2_intensity: 0.0
+  description: "Industrial flue gas or low-grade process waste heat."
+
+natural_gas:
+  T_hot: 1200.0
+  cost_index: 0.4
+  co2_intensity: 0.49
+  description: "High-temperature combustion for gas turbines."
