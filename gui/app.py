@@ -9,6 +9,7 @@ import os
 import sys
 
 import CoolProp.CoolProp as CP
+import plotly.graph_objects as go
 import streamlit as st
 import yaml
 
@@ -49,19 +50,71 @@ st.markdown(
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto+Mono&display=swap');
         
-        html, body, [class*="st-"] {{
+        html, body {{
             font-family: 'Inter', sans-serif;
             color: {TEXT_LIGHT};
         }}
-        
+
+        /* Streamlit components - be selective */
+        [class*="st-"] {{
+            color: {TEXT_LIGHT};
+        }}
+
         .stApp {{
             background-color: {BG_DARK};
         }}
-        
+
         .main {{
             background-color: {BG_DARK};
         }}
-        
+
+        :root {{
+            color-scheme: dark;
+            background-color: {BG_DARK};
+        }}
+
+        /* Specific input styling - avoid global selectors */
+        .stNumberInput input,
+        .stTextInput input,
+        .stTextArea textarea,
+        .stSelectbox select {{
+            background-color: {CARD_DARK} !important;
+            color: {TEXT_LIGHT} !important;
+            border: 1px solid {BORDER_DARK} !important;
+            border-radius: 12px !important;
+            padding: 8px 12px !important;
+            font-size: 14px !important;
+            line-height: 1.4 !important;
+            min-height: 20px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }}
+
+        .stNumberInput input:focus,
+        .stTextInput input:focus,
+        .stTextArea textarea:focus,
+        .stSelectbox select:focus {{
+            outline: 2px solid {ACCENT_CYAN} !important;
+            outline-offset: 1px !important;
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.16) !important;
+            border-color: {ACCENT_CYAN} !important;
+        }}
+
+        /* Fix textarea multi-line */
+        .stTextArea textarea {{
+            white-space: pre-wrap !important;
+            resize: vertical !important;
+            min-height: 80px !important;
+        }}
+
+        /* Fix select dropdown arrow */
+        .stSelectbox select {{
+            appearance: auto !important;
+            background-image: none !important;
+            padding-right: 30px !important;
+        }}
+
         /* Metric Cards Styling */
         div[data-testid="stMetric"] {{
             background-color: {CARD_DARK};
@@ -92,23 +145,68 @@ st.markdown(
             letter-spacing: 0.1em;
         }}
         
-        /* Sidebar Styling */
-        section[data-testid="stSidebar"] {{
-            background-color: {SIDEBAR_DARK};
-            border-right: 1px solid {BORDER_DARK};
+        /* Fix navbar and icon issues */
+        .stApp header {{
+            background-color: {BG_DARK} !important;
+        }}
+
+        /* Don't apply custom font to icons and special elements */
+        .stApp header *,
+        button svg,
+        .stApp [data-testid*="icon"],
+        .stApp [data-testid*="arrow"],
+        .stApp [class*="icon"] {{
+            font-family: inherit !important;
+        }}
+
+        /* Fix double arrow display */
+        .stApp [data-testid="stSidebarNav"] button,
+        .stApp header button {{
+            font-family: inherit !important;
+        }}
+
+        /* Ensure icons remain visible */
+        .stApp svg {{
+            fill: currentColor !important;
         }}
         
-        section[data-testid="stSidebar"] .stText, 
-        section[data-testid="stSidebar"] label,
-        section[data-testid="stSidebar"] .stMarkdown,
-        section[data-testid="stSidebar"] p {{
+        /* Slider styling */
+        .stSidebar .stSlider div[data-baseweb="slider"] {{
+            background-color: {CARD_DARK} !important;
+        }}
+
+        .stSidebar .stSlider [data-testid="stThumbValue"] {{
+            background-color: {ACCENT_CYAN} !important;
+            color: {BG_DARK} !important;
+            font-weight: 600 !important;
+        }}
+
+        /* Fix text overflow in inputs */
+        .stNumberInput input,
+        .stTextInput input {{
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }}
+
+        /* Ensure proper spacing in sidebar */
+        .stSidebar .stNumberInput,
+        .stSidebar .stTextInput,
+        .stSidebar .stSelectbox,
+        .stSidebar .stMultiselect {{
+            margin-bottom: 8px !important;
+        }}
+
+        /* Fix expander styling */
+        .stSidebar .streamlit-expanderHeader {{
+            background-color: {CARD_DARK} !important;
+            border: 1px solid {BORDER_DARK} !important;
+            border-radius: 8px !important;
             color: {TEXT_LIGHT} !important;
         }}
-        
-        /* Sidebar Inputs */
-        .stSelectbox, .stMultiSelect, .stNumberInput, .stSlider {{
-            background-color: {CARD_DARK} !important;
-            border-radius: 8px !important;
+
+        .stSidebar .streamlit-expanderHeader:hover {{
+            background-color: rgba(56, 189, 248, 0.08) !important;
         }}
         
         /* Header and Titles */
@@ -152,17 +250,20 @@ st.markdown(
         .stButton>button {{
             background-color: {ACCENT_CYAN} !important;
             color: {BG_DARK} !important;
-            border-radius: 8px !important;
-            border: none !important;
-            padding: 0.6rem 1.2rem !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(56, 189, 248, 0.4) !important;
+            padding: 0.75rem 1.3rem !important;
             font-weight: 700 !important;
             transition: all 0.2s ease !important;
             width: 100%;
+            box-shadow: 0 18px 38px rgba(56, 189, 248, 0.14) !important;
         }}
         
         .stButton>button:hover {{
             background-color: {ACCENT_AMBER} !important;
-            transform: scale(1.02);
+            color: {BG_DARK} !important;
+            transform: translateY(-1px) scale(1.01);
+            border-color: rgba(251, 180, 36, 0.5) !important;
         }}
         
         /* Dataframes & Tables */
@@ -175,25 +276,37 @@ st.markdown(
         /* Tabs */
         .stTabs [data-baseweb="tab-list"] {{
             gap: 24px;
-            background-color: transparent;
+            background-color: {CARD_DARK};
+            border: 1px solid {BORDER_DARK};
+            border-radius: 12px 12px 0 0;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+            padding: 6px;
         }}
-        
+
         .stTabs [data-baseweb="tab"] {{
-            height: 50px;
+            height: 48px;
             white-space: pre-wrap;
-            background-color: transparent;
-            border-radius: 4px 4px 0px 0px;
+            background-color: {CARD_DARK};
+            border-radius: 8px 8px 0px 0px;
             gap: 1px;
             padding-top: 10px;
             padding-bottom: 10px;
             color: {TEXT_DIM};
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }}
+
+        .stTabs [data-baseweb="tab"]:hover {{
+            background-color: rgba(56, 189, 248, 0.08);
         }}
 
         .stTabs [aria-selected="true"] {{
             color: {ACCENT_CYAN} !important;
             border-bottom-color: {ACCENT_CYAN} !important;
+            background-color: {BG_DARK};
+            box-shadow: inset 0 -3px 0 0 {ACCENT_CYAN};
         }}
-        
+
         /* Mono fonts */
         code, .mono {{
             font-family: 'Roboto Mono', monospace !important;
@@ -340,12 +453,12 @@ if execute_btn:
 
         # Visualization Tabs
         st.markdown("---")
-        t1, t2, t3 = st.tabs(["🏗️ Schematic", "📈 T-s Diagram", "📉 P-v Diagram"])
+        t1, t2, t3, t4 = st.tabs(["🏗️ Schematic", "📈 T-s Diagram", "📉 P-v Diagram", "⚡ Efficiency"])
         
         with t1:
             svg_buf = FlowChartGenerator.create_diagram(cycle_definition.get('name', selected_cycle_key.title()), cycle_obj.get_component_list(), states, metrics)
             b64 = base64.b64encode(svg_buf.getvalue()).decode('utf-8')
-            st.markdown(f'<div style="background-color: white; padding: 20px; border-radius: 12px; display: flex; justify-content: center;"><img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; height: auto;"/></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background-color: {CARD_DARK}; padding: 24px; border-radius: 18px; display: flex; justify-content: center; border: 1px solid {BORDER_DARK}; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32); outline: 1px solid rgba(56, 189, 248, 0.12);"><img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; height: auto;"/></div>', unsafe_allow_html=True)
 
         with t2:
             st.plotly_chart(TSDiagram.create_plot(states, cycle_definition.get('name', selected_cycle_key.title()), fluid), use_container_width=True)
@@ -353,19 +466,170 @@ if execute_btn:
         with t3:
             st.plotly_chart(PVDiagram.create_plot(states, cycle_definition.get('name', selected_cycle_key.title()), fluid), use_container_width=True)
 
+        with t4:
+            st.markdown("### ⚡ Efficiency Breakdown")
+            eff_type = st.radio(
+                "Select efficiency type:",
+                ["Thermal Efficiency", "Second Law Efficiency"],
+                index=0,
+                horizontal=True,
+            )
+
+            q_in = metrics.get('q_in', 0.0)
+            q_out = metrics.get('q_out', 0.0)
+            w_net = metrics.get('w_net', 0.0)
+            thermal_eff = metrics.get('efficiency', 0.0)
+            second_eff = metrics.get('second_law_efficiency', 0.0)
+
+            if eff_type == "Thermal Efficiency":
+                st.markdown(
+                    fr"""
+                    **Formula:** thermal efficiency = $\frac{{W_{{net}}}}{{Q_{{in}}}} \times 100\%$  
+                    **Values:** $W_{{net}} = {w_net:.1f}\ \text{{kJ/kg}}$, $Q_{{in}} = {q_in:.1f}\ \text{{kJ/kg}}$  
+                    **Result:** $\eta = {thermal_eff:.1f}\%$  
+                    """,
+                    unsafe_allow_html=True,
+                )
+                fig = go.Figure(
+                    data=[
+                        go.Bar(name='Useful Work', x=['Energy Flow'], y=[w_net], marker_color='#38bdf8', hovertemplate='W_net: %{y:.1f} kJ/kg'),
+                        go.Bar(name='Rejected Heat', x=['Energy Flow'], y=[q_out], marker_color='#ffb703', hovertemplate='Q_out: %{y:.1f} kJ/kg'),
+                    ]
+                )
+                fig.update_layout(
+                    barmode='stack',
+                    plot_bgcolor=BG_DARK,
+                    paper_bgcolor=BG_DARK,
+                    font_color=TEXT_LIGHT,
+                    title='Energy balance for thermal efficiency',
+                    xaxis_title='',
+                    yaxis_title='kJ/kg',
+                    legend_title_text='',
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+            else:
+                st.markdown(
+                    fr"""
+                    **Formula:** second law efficiency compares actual output to the ideal reversible limit.  
+                    **Result:** {second_eff:.1f}\%  
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.info(
+                    "Second Law Efficiency indicates how closely the cycle approaches the theoretical maximum work available under the same heat inputs."
+                )
+
+            with st.expander("How efficiency is calculated"):
+                st.markdown(
+                    f"""
+                    - **Heat input** $Q_{{in}}$ is the total thermal energy added to the cycle.  
+                    - **Work output** $W_{{net}}$ is the useful shaft work after subtracting pump and compressor losses.  
+                    - **Rejected heat** $Q_{{out}} = Q_{{in}} - W_{{net}}$.  
+                    - **Thermal efficiency** is the ratio of useful work to heat input, showing how effectively the cycle converts heat into work.  
+                    - **Second law efficiency** is an advanced performance metric that includes irreversibilities and how far the cycle is from an ideal reversible process.
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown("---")
+
         # State Point Table
         st.markdown("---")
         st.markdown("### 📝 Detailed State Point Analytics")
-        state_rows = []
+
+        temp_unit = col1 = col2 = col3 = col4 = None
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            temp_unit = st.selectbox("Temperature units", ["°C", "K", "°F"], index=0)
+        with c2:
+            press_unit = st.selectbox("Pressure units", ["MPa", "bar", "kPa"], index=0)
+        with c3:
+            enth_unit = st.selectbox("Enthalpy units", ["kJ/kg", "MJ/kg", "J/kg"], index=0)
+        with c4:
+            entro_unit = st.selectbox("Entropy units", ["kJ/kg·K", "J/kg·K"], index=0)
+
+        def format_temperature(value, unit):
+            if value is None:
+                return ""
+            if unit == "K":
+                return f"{value:.2f}"
+            if unit == "°F":
+                return f"{(value - 273.15) * 9/5 + 32:.2f}"
+            return f"{value - 273.15:.2f}"
+
+        def format_pressure(value, unit):
+            if value is None:
+                return ""
+            if unit == "bar":
+                return f"{value / 1e5:.3f}"
+            if unit == "kPa":
+                return f"{value / 1e3:.1f}"
+            return f"{value / 1e6:.3f}"
+
+        def format_enthalpy(value, unit):
+            if value is None:
+                return ""
+            if unit == "MJ/kg":
+                return f"{value / 1e6:.3f}"
+            if unit == "J/kg":
+                return f"{value:.0f}"
+            return f"{value / 1000:.1f}"
+
+        def format_entropy(value, unit):
+            if value is None:
+                return ""
+            if unit == "J/kg·K":
+                return f"{value:.3f}"
+            return f"{value / 1000:.3f}"
+
+        headers = [
+            ("Point", "State point number in the cycle sequence."),
+            (f"T ({temp_unit})", "Temperature at the state point, describing heat level."),
+            (f"P ({press_unit})", "Pressure at the state point, defining fluid compression."),
+            (f"h ({enth_unit})", "Specific enthalpy indicates energy content per unit mass."),
+            (f"s ({entro_unit})", "Specific entropy measures disorder and irreversibility."),
+        ]
+
+        row_tooltips = {
+            "Point": "The sequential state number around the thermodynamic cycle.",
+            "Temperature": "Temperature shows how hot or cold the working fluid is at this state.",
+            "Pressure": "Pressure is the mechanical force per area in the working fluid.",
+            "Enthalpy": "Enthalpy is the energy content per kilogram of fluid.",
+            "Entropy": "Entropy is a measure of energy unavailable for work at this state.",
+        }
+
+        table_html = [
+            f'<div style="overflow-x:auto; margin-top:1rem; border:1px solid {BORDER_DARK}; border-radius:14px; background:{CARD_DARK}; padding:12px;">',
+            '<table style="width:100%; border-collapse: collapse; font-family: Inter, sans-serif; color: {TEXT_LIGHT};">'.replace('{TEXT_LIGHT}', TEXT_LIGHT),
+            '<thead><tr>'
+        ]
+
+        for label, tooltip in headers:
+            table_html.append(
+                f'<th title="{tooltip}" style="text-align:left; padding:12px 14px; border-bottom:1px solid {BORDER_DARK}; font-size:0.95rem; color:{TEXT_LIGHT}; background:rgba(255,255,255,0.02);">{label}</th>'
+            )
+        table_html.append('</tr></thead><tbody>')
+
         for sid, st_obj in states.items():
-            row = st_obj.to_dict()
-            row['Point'] = sid
-            row['T (°C)'] = f"{row['T'] - 273.15:.2f}"
-            row['P (MPa)'] = f"{row['P'] / 1e6:.3f}"
-            row['h (kJ/kg)'] = f"{row['h'] / 1000:.1f}"
-            row['s (kJ/kg·K)'] = f"{row['s'] / 1000:.3f}"
-            state_rows.append(row)
-        st.dataframe(state_rows, use_container_width=True)
+            table_html.append('<tr>')
+            table_html.append(f'<td title="{row_tooltips["Point"]}" style="padding:12px 14px; border-bottom:1px solid {BORDER_DARK};">{sid}</td>')
+            table_html.append(
+                f'<td title="{row_tooltips["Temperature"]}" style="padding:12px 14px; border-bottom:1px solid {BORDER_DARK};">{format_temperature(st_obj.T, temp_unit)}</td>'
+            )
+            table_html.append(
+                f'<td title="{row_tooltips["Pressure"]}" style="padding:12px 14px; border-bottom:1px solid {BORDER_DARK};">{format_pressure(st_obj.P, press_unit)}</td>'
+            )
+            table_html.append(
+                f'<td title="{row_tooltips["Enthalpy"]}" style="padding:12px 14px; border-bottom:1px solid {BORDER_DARK};">{format_enthalpy(st_obj.h, enth_unit)}</td>'
+            )
+            table_html.append(
+                f'<td title="{row_tooltips["Entropy"]}" style="padding:12px 14px; border-bottom:1px solid {BORDER_DARK};">{format_entropy(st_obj.s, entro_unit)}</td>'
+            )
+            table_html.append('</tr>')
+
+        table_html.append('</tbody></table></div>')
+        st.markdown(''.join(table_html), unsafe_allow_html=True)
 
     except Exception as exc:
         logger.exception("Cycle execution failed")
@@ -374,8 +638,8 @@ else:
     st.info("💡 Define your cycle constraints in the sidebar and click **RUN ANALYSIS** to begin.")
     st.markdown(
         f"""
-        <div style="background-color: {CARD_DARK}; padding: 30px; border-radius: 12px; border: 1px solid {BORDER_DARK}; text-align: center;">
-            <p style="color: {TEXT_DIM}; font-size: 1.2rem;">Ready for simulation. Select a cycle architecture to view theoretical schematics.</p>
+        <div style="background-color: {CARD_DARK}; padding: 34px; border-radius: 18px; border: 1px solid {BORDER_DARK}; text-align: center; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28); outline: 1px solid rgba(56, 189, 248, 0.12);">
+            <p style="color: {TEXT_DIM}; font-size: 1.2rem; margin: 0;">Ready for simulation. Select a cycle architecture to view theoretical schematics.</p>
         </div>
         """,
         unsafe_allow_html=True
