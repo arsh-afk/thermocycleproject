@@ -2,49 +2,75 @@
 Diesel Cycle Solver
 Educational note: Standard compression-ignition engine model.
 States: 1-Intake (BDC), 2-Compression (TDC), 3-Heat Addition (Constant P), 4-Expansion (BDC).
+
+Engineering Principle: Unlike the Otto cycle, heat is added at constant pressure.
+Efficiency = 1 - (1/r^(k-1)) * (rc^k - 1) / (k*(rc - 1)).
+SOURCE: Cengel, Thermodynamics: An Engineering Approach, Chapter 9.
 """
 from core.base_cycle import BaseCycle
 
+
 class DieselCycle(BaseCycle):
+    """Air-standard Diesel cycle solver (compression-ignition engine model)."""
+
     def __init__(self, fluid="Air"):
         super().__init__(fluid)
-        
+
     def solve(self, params):
+        """
+        Solves the four-state Diesel cycle.
+        Processes:
+          1-2: Isentropic Compression
+          2-3: Constant-Pressure Heat Addition (Isobaric)
+          3-4: Isentropic Expansion
+          4-1: Constant-Volume Heat Rejection (Isochoric)
+        """
         self.clear_states()
-        
-        # Mapping UI keys and providing defaults
+
         defaults = {
             'r': 16.0,
             'rc': 2.0,
             'T_min': 25.0 + 273.15,
             'P_min': 0.1 * 1e6,
         }
-        
+
         current = defaults.copy()
         if 'r' in params: current['r'] = params['r']
         if 'rc' in params: current['rc'] = params['rc']
         if 'T_min' in params: current['T_min'] = params['T_min'] + 273.15
         if 'P_min' in params: current['P_min'] = params['P_min'] * 1e6
-        
+
         r = current['r']
         rc = current['rc']
         T1 = current['T_min']
         P1 = current['P_min']
-        
+
+        # State 1: Intake at BDC
         self.states[1] = self.get_state('P', P1, 'T', T1, "Intake BDC")
-        
+
+        # State 2: End of isentropic compression (TDC)
         v2 = self.states[1].v / r
         self.states[2] = self.get_state('V', v2, 'S', self.states[1].s, "Compression TDC")
-        
-        v3 = v2 * rc
-        self.states[3] = self.get_state('P', self.states[2].P, 'V', v3, "Combustion Exit")
-        
+
+        # State 3: After constant-pressure heat addition
+        # State 3: After constant-pressure heat addition.
+        # CoolProp's Air mixture backend does not support P+D (density) queries.
+        # For an ideal gas at constant pressure: v3/v2 = T3/T2, so T3 = T2 * rc.
+        T3 = self.states[2].T * rc
+        self.states[3] = self.get_state('P', self.states[2].P, 'T', T3, "Combustion Exit")
+
+        # State 4: End of isentropic expansion (BDC)
         v4 = self.states[1].v
         self.states[4] = self.get_state('V', v4, 'S', self.states[3].s, "Expansion BDC")
-        
+
         return self.states
 
     def calculate_performance(self):
+        """
+        Calculates Diesel cycle performance.
+        Heat addition is isobaric (constant pressure), so q_in uses enthalpy difference.
+        Heat rejection is isochoric, so q_out uses internal energy difference.
+        """
         if not self.states:
             return {}
 
@@ -52,13 +78,12 @@ class DieselCycle(BaseCycle):
             return st.h - st.P * st.v
 
         u1 = get_u(self.states[1])
-        u2 = get_u(self.states[2])
         u4 = get_u(self.states[4])
         h2 = self.states[2].h
         h3 = self.states[3].h
 
-        q_in = h3 - h2
-        q_out = u4 - u1
+        q_in = h3 - h2          # Isobaric heat addition: q = Δh
+        q_out = u4 - u1         # Isochoric heat rejection: q = Δu
         w_net = q_in - q_out
         T_hot = self.states[3].T
         T_cold = self.states[1].T
@@ -66,7 +91,7 @@ class DieselCycle(BaseCycle):
         s_gen = self.calculate_entropy_generation(q_in, T_hot, q_out, T_cold)
         sl_eff = self.calculate_second_law_efficiency(efficiency, T_hot, T_cold)
 
-        return {
+        self.metrics = {
             'efficiency': efficiency,
             'w_net': w_net / 1000,
             'q_in': q_in / 1000,
@@ -74,6 +99,7 @@ class DieselCycle(BaseCycle):
             's_gen': s_gen,
             'second_law_efficiency': sl_eff,
         }
+        return self.metrics
 
     def validate_inputs(self, params):
         errors = []

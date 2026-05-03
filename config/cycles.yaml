@@ -1,81 +1,119 @@
-# Cycle Architectures Definition
-# Educational note: Cycles are defined by their component sequences and connection logic.
-# These YAML definitions allow adding new cycle types without changing Python logic.
+# Cycle Templates Definition
+# Educational note: Moving to a strict template-based architecture ensures thermodynamic accuracy.
+# Users select specific, pre-configured layouts with fixed degrees of freedom.
 
-rankine:
-  name: "Rankine Cycle"
-  components: ["Feed Pump", "Boiler", "High Pressure Turbine", "Reheater", "Low Pressure Turbine", "Condenser"]
-  defaults:
-    P_min: 0.01 # MPa
-    P_max: 15.0 # MPa
-    T_max: 550.0 # C
-    n_rh: 1
-    n_fwh: 2
-  ranges:
-    P_min: [0.001, 0.5]
-    P_max: [1.0, 35.0]
-    T_max: [100.0, 750.0]
+rankine_basic:
+  name: "Rankine Cycle: Basic"
+  category: "Rankine"
+  components: ["Pump", "Boiler", "Turbine", "Condenser"]
+  required_inputs:
+    P_max: {label: "Boiler Pressure", unit: "MPa", min: 5.0, max: 20.0, default: 15.0}
+    P_min: {label: "Condenser Pressure", unit: "MPa", min: 0.005, max: 0.1, default: 0.01}
+    T_max: {label: "Turbine Inlet Temp", unit: "C", min: 300.0, max: 620.0, default: 550.0}
 
-brayton:
-  name: "Brayton Cycle"
-  components: ["Compressor", "Intercooler", "Combustor", "Turbine", "Regenerator"]
-  defaults:
-    P_min: 0.1 # MPa
-    P_max: 1.2 # MPa
-    T_min: 25.0 # C
-    T_max: 1100.0 # C
-    n_ic: 1
-    n_rh: 1
-  ranges:
-    P_min: [0.05, 1.0]
-    P_max: [0.5, 50.0]
-    T_max: [500.0, 1600.0]
+rankine_reheat:
+  name: "Rankine Cycle: Single Reheat"
+  category: "Rankine"
+  components: ["Pump", "Boiler", "HP Turbine", "Reheater", "LP Turbine", "Condenser"]
+  required_inputs:
+    P_max: {label: "Boiler Pressure", unit: "MPa", min: 10.0, max: 30.0, default: 20.0}
+    P_min: {label: "Condenser Pressure", unit: "MPa", min: 0.005, max: 0.1, default: 0.01}
+    T_max: {label: "Turbine Inlet Temp", unit: "C", min: 450.0, max: 620.0, default: 550.0}
+    P_rh: {label: "Reheat Pressure", unit: "MPa", min: 1.5, max: 6.0, default: 4.0}
 
-sco2:
-  name: "Supercritical CO2 Brayton"
-  configurations: ["simple_recuperated", "recompression", "partial_cooling"]
-  defaults:
-    configuration: "recompression"
-    P_low: 7.6 # MPa
-    P_high: 25.0 # MPa
-    T_comp_in: 32.0 # C
-    T_turb_in: 550.0 # C
-    split_frac: 0.35
-  ranges:
-    P_low: [7.38, 10.0] # Near critical is 7.377 MPa
-    P_high: [10.0, 35.0]
-    T_turb_in: [200.0, 800.0]
+rankine_open_fwh:
+  name: "Rankine Cycle: Regenerative (1 Open FWH)"
+  category: "Rankine"
+  components: ["Cond. Pump", "Open FWH", "Feed Pump", "Boiler", "Turbine", "Condenser"]
+  required_inputs:
+    P_max: {label: "Boiler Pressure", unit: "MPa", min: 10.0, max: 25.0, default: 15.0}
+    P_min: {label: "Condenser Pressure", unit: "MPa", min: 0.005, max: 0.1, default: 0.01}
+    T_max: {label: "Turbine Inlet Temp", unit: "C", min: 400.0, max: 620.0, default: 550.0}
+    P_ext: {label: "Extraction Pressure", unit: "MPa", min: 0.2, max: 2.0, default: 0.8}
 
-otto:
-  name: "Otto Cycle"
-  defaults:
-    r: 8.0
-    T_max: 1500.0
-    P_min: 0.1
-    T_min: 25.0
+brayton_simple:
+  name: "Brayton Cycle: Simple Gas Turbine"
+  category: "Brayton"
+  components: ["Compressor", "Combustor", "Turbine"]
+  required_inputs:
+    rp: {label: "Pressure Ratio", unit: "", min: 5.0, max: 25.0, default: 12.0}
+    T_max: {label: "Turbine Inlet Temp", unit: "K", min: 1000.0, max: 1500.0, default: 1200.0}
+    T_min: {label: "Compressor Inlet Temp", unit: "K", min: 280.0, max: 320.0, default: 300.0}
 
-diesel:
-  name: "Diesel Cycle"
-  defaults:
-    r: 16.0
-    rc: 2.0
-    T_max: 1800.0
-    P_min: 0.1
-    T_min: 25.0
+brayton_regen:
+  name: "Brayton Cycle: Regenerative"
+  category: "Brayton"
+  components: ["Compressor", "Regenerator (Cold)", "Combustor", "Turbine", "Regenerator (Hot)"]
+  required_inputs:
+    rp: {label: "Pressure Ratio", unit: "", min: 3.0, max: 15.0, default: 8.0}
+    T_max: {label: "Turbine Inlet Temp", unit: "K", min: 1000.0, max: 1500.0, default: 1200.0}
+    epsilon: {label: "Regen Effectiveness", unit: "", min: 0.5, max: 0.95, default: 0.8}
 
-stirling:
-  name: "Stirling Cycle"
-  defaults:
-    r: 2.0
-    T_hot: 800.0
-    T_cold: 25.0
-    P_max: 10.0
+refrigeration_ideal:
+  name: "Refrigeration: Ideal Vapor-Compression"
+  category: "Refrigeration"
+  components: ["Compressor", "Condenser", "Expansion Valve", "Evaporator"]
+  required_inputs:
+    P_low: {label: "Evaporator Pressure", unit: "MPa", min: 0.05, max: 0.5, default: 0.15}
+    P_high: {label: "Condenser Pressure", unit: "MPa", min: 0.8, max: 2.5, default: 1.2}
 
-ericsson:
-  name: "Ericsson Cycle"
-  defaults:
-    rp: 10.0
-    T_hot: 800.0
-    T_cold: 25.0
-    P_max: 10.0
-    P_min: 0.1
+otto_standard:
+  name: "Otto Cycle: Air-Standard"
+  category: "IC Engine"
+  components: ["Isentropic Compression", "Isochoric Heat Addition", "Isentropic Expansion", "Isochoric Heat Rejection"]
+  required_inputs:
+    r: {label: "Compression Ratio", unit: "", min: 7.0, max: 11.0, default: 8.0}
+    T_max: {label: "Max Temperature", unit: "K", min: 1500.0, max: 2500.0, default: 2000.0}
+    T_min: {label: "Initial Temperature", unit: "K", min: 280.0, max: 320.0, default: 300.0}
+
+diesel_standard:
+  name: "Diesel Cycle: Air-Standard"
+  category: "IC Engine"
+  components: ["Isentropic Compression", "Isobaric Heat Addition", "Isentropic Expansion", "Isochoric Heat Rejection"]
+  required_inputs:
+    r: {label: "Compression Ratio", unit: "", min: 14.0, max: 24.0, default: 18.0}
+    rc: {label: "Cutoff Ratio", unit: "", min: 1.2, max: 3.0, default: 2.0}
+    T_min: {label: "Initial Temperature", unit: "K", min: 280.0, max: 320.0, default: 300.0}
+
+sco2_recompression:
+  name: "sCO2 Recompression Brayton"
+  category: "Advanced"
+  components: ["Main Compressor", "LTR (Cold)", "Mixer", "HTR (Cold)", "Primary Heater", "Turbine", "HTR (Hot)", "LTR (Hot)", "Flow Split", "Recompressor/Cooler"]
+  required_inputs:
+    P_min: {label: "Low-Side Pressure", unit: "MPa", min: 7.4, max: 12.0, default: 7.6}
+    P_max: {label: "High-Side Pressure", unit: "MPa", min: 15.0, max: 35.0, default: 25.0}
+    T_min: {label: "Compressor Inlet Temp", unit: "C", min: 31.5, max: 45.0, default: 32.0}
+    T_max: {label: "Turbine Inlet Temp", unit: "C", min: 400.0, max: 700.0, default: 550.0}
+    split_frac: {label: "Recompression Split Fraction", unit: "", min: 0.1, max: 0.6, default: 0.35}
+    recup_eff: {label: "Recuperator Effectiveness", unit: "", min: 0.7, max: 0.99, default: 0.95}
+
+stirling_standard:
+  name: "Stirling Cycle: Air-Standard"
+  category: "Advanced"
+  components: ["Isothermal Compression", "Regeneration", "Isothermal Expansion", "Regeneration"]
+  required_inputs:
+    T_max: {label: "Hot Temperature", unit: "C", min: 200.0, max: 1000.0, default: 800.0}
+    T_min: {label: "Cold Temperature", unit: "C", min: 10.0, max: 100.0, default: 25.0}
+    P_max: {label: "Max Pressure", unit: "MPa", min: 1.0, max: 20.0, default: 10.0}
+    r: {label: "Expansion Ratio", unit: "", min: 1.5, max: 6.0, default: 2.0}
+
+ericsson_standard:
+  name: "Ericsson Cycle: Air-Standard"
+  category: "Advanced"
+  components: ["Isothermal Compression", "Regeneration", "Isothermal Expansion", "Regeneration"]
+  required_inputs:
+    T_max: {label: "Hot Temperature", unit: "C", min: 200.0, max: 1000.0, default: 800.0}
+    T_min: {label: "Cold Temperature", unit: "C", min: 10.0, max: 100.0, default: 25.0}
+    P_max: {label: "High Pressure", unit: "MPa", min: 1.0, max: 20.0, default: 10.0}
+    P_min: {label: "Low Pressure", unit: "MPa", min: 0.05, max: 1.0, default: 0.1}
+
+combined_brayton_rankine:
+  name: "Combined Cycle: Brayton + Rankine"
+  category: "Advanced"
+  components: ["Brayton Compressor", "Brayton Combustor", "Brayton Turbine", "HRSG", "Rankine Pump", "Rankine Boiler", "Rankine Turbine", "Rankine Condenser"]
+  required_inputs:
+    B_P_max: {label: "Brayton High Pressure", unit: "MPa", min: 0.5, max: 3.0, default: 1.2}
+    B_T_max: {label: "Brayton Turbine Inlet", unit: "C", min: 800.0, max: 1400.0, default: 1100.0}
+    R_P_max: {label: "Rankine Boiler Pressure", unit: "MPa", min: 3.0, max: 15.0, default: 10.0}
+    R_T_max: {label: "Rankine Turbine Inlet", unit: "C", min: 300.0, max: 550.0, default: 450.0}
+

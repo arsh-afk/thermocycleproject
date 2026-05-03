@@ -2,6 +2,7 @@
 CoolProp Wrapper for Thermodynamic Properties
 Handles unit conversions (Internal SI) and physical boundary protection.
 Grounded in Span-Wagner (CO2) and IAPWS-IF97 (Water) via CoolProp.
+SOURCE: CoolProp Documentation and IAPWS standards.
 """
 import logging
 
@@ -11,34 +12,54 @@ from core.state import ThermodynamicState
 logger = logging.getLogger(__name__)
 
 class PropertyWrapper:
-    """Centralized property calculation engine with safety checks."""
+    """
+    Centralized property calculation engine with safety checks.
+    Engineering Principle: Thermodynamic properties are inter-related.
+    Given any two independent intensive properties, all other properties can be determined.
+    """
 
     @staticmethod
     def get_state(fluid, prop1, val1, prop2, val2, note=""):
         """
-        Retrieves state from CoolProp with physical boundary validation.
-        Internal units: T(K), P(Pa), H(J/kg), S(J/kgK), D(kg/m3).
+        Retrieves a full thermodynamic state from CoolProp using two inputs.
+        Internal units are SI: T(K), P(Pa), H(J/kg), S(J/kgK), D(kg/m3).
+        
+        Args:
+            fluid (str): The fluid name (e.g., 'Water', 'CO2').
+            prop1, val1: First property key (e.g., 'P') and value.
+            prop2, val2: Second property key (e.g., 'T') and value.
+            note (str): Descriptive label for the state.
+            
+        Engineering Principle: The State Postulate.
+        Note: Pressure 'P' and Temperature 'T' are NOT independent in the two-phase region.
+        In such cases, 'P' and Quality 'X' or 'T' and Quality 'X' must be used.
         """
-        p1 = 'Q' if prop1.upper() == 'X' else prop1.upper()
-        p2 = 'Q' if prop2.upper() == 'X' else prop2.upper()
+        def map_prop(p, v):
+            """Internal mapping of property keys to CoolProp standard."""
+            p = p.upper()
+            if p == 'X': return 'Q', v # Quality
+            if p == 'V': return 'D', 1.0 / v # Specific Volume to Density
+            return p, v
 
+        p1, v1 = map_prop(prop1, val1)
+        p2, v2 = map_prop(prop2, val2)
+
+        # Safety Check for CO2 (Dry Ice boundary)
         if fluid == 'CO2':
-            P_val = None
-            if p1 == 'P':
-                P_val = val1
-            elif p2 == 'P':
-                P_val = val2
+            P_val = v1 if p1 == 'P' else (v2 if p2 == 'P' else None)
             if P_val is not None and P_val < 518000:
-                raise ValueError(f"Pressure {P_val/1e6:.3f} MPa is below CO2 triple point.")
+                raise ValueError(f"Pressure {P_val/1e6:.3f} MPa is below CO2 triple point (0.518 MPa).")
 
         try:
-            T = CP.PropsSI('T', p1, val1, p2, val2, fluid)
-            P = CP.PropsSI('P', p1, val1, p2, val2, fluid)
-            h = CP.PropsSI('H', p1, val1, p2, val2, fluid)
-            s = CP.PropsSI('S', p1, val1, p2, val2, fluid)
-            rho = CP.PropsSI('D', p1, val1, p2, val2, fluid)
+            # Query CoolProp for core properties
+            T = CP.PropsSI('T', p1, v1, p2, v2, fluid)
+            P = CP.PropsSI('P', p1, v1, p2, v2, fluid)
+            h = CP.PropsSI('H', p1, v1, p2, v2, fluid)
+            s = CP.PropsSI('S', p1, v1, p2, v2, fluid)
+            rho = CP.PropsSI('D', p1, v1, p2, v2, fluid)
         except Exception as exc:
             logger.exception("CoolProp state calculation failed")
+            # Provide helpful range information for debugging non-physical inputs
             limits = PropertyWrapper.get_fluid_limits(fluid)
             limit_str = ""
             if limits:
@@ -51,13 +72,17 @@ class PropertyWrapper:
                         limit_str += f"  {prop}: {min_val:.2e} to {max_val:.2e}\n"
             raise ValueError(f"Thermodynamic calculation failed for {fluid} with {p1}={val1}, {p2}={val2}: {exc}{limit_str}") from exc
 
-        state = ThermodynamicState(T=T, P=P, h=h, s=s, rho=rho, v=(1.0 / rho if rho else None), note=note)
+        # Construct the state object
+        state = ThermodynamicState(T=T, P=P, h=h, s=s, rho=rho, v=(1.0 / rho if rho else None), note=note, fluid=fluid)
 
+        # Attempt to get Quality (X/Q)
         try:
             state.x = CP.PropsSI('Q', p1, val1, p2, val2, fluid)
         except Exception:
-            state.x = -1
+            # CoolProp throws exception for quality in subcooled or superheated regions
+            state.x = -1 # Convention for single-phase
 
+        # Phase Identification
         T_crit = CP.PropsSI('T_CRITICAL', fluid)
         P_crit = CP.PropsSI('P_CRITICAL', fluid)
         if T > T_crit and P > P_crit:
@@ -72,7 +97,10 @@ class PropertyWrapper:
 
     @staticmethod
     def get_fluid_limits(fluid):
-        """Get valid property ranges for the fluid."""
+        """
+        Retrieves the valid property ranges for the specified fluid.
+        Helps prevent out-of-bounds errors in iterative solvers.
+        """
         limits = {}
         limit_keys = [
             ('T_min', 'T_MIN'), ('T_max', 'T_MAX'),
@@ -84,11 +112,15 @@ class PropertyWrapper:
             try:
                 limits[limit_name] = CP.PropsSI(cp_key, fluid)
             except Exception:
-                pass  # Skip if not available
+                pass 
         return limits
 
     @staticmethod
     def get_fluid_constants(fluid):
+        """
+        Returns critical and triple point constants for a fluid.
+        Triple point defines the lower limit of the fluid's validity in the database.
+        """
         try:
             return {
                 'T_crit': CP.PropsSI('T_CRITICAL', fluid),

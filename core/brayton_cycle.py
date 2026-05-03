@@ -1,146 +1,101 @@
-"""
-Modular Gas Brayton Cycle Solver
-Educational note: Gas turbines use intercooling and reheating to approximate 
-the Ericsson cycle (isothermal compression/expansion), which maximizes efficiency.
-SOURCE: Textbooks benchmarks for Gas Turbine Cycles.
-"""
 from core.base_cycle import BaseCycle
-from core.components import Turbine, Compressor
+from core.components import Compressor, Turbine
 
 class BraytonCycle(BaseCycle):
-    """Modular Brayton Cycle with N-stages."""
-    
+    """
+    Refactored Template-Based Brayton Cycle Solver.
+    Supports simple and regenerative configurations.
+    """
     VALID_FLUIDS = ['Air', 'Nitrogen', 'Helium', 'Argon', 'Neon']
-    
+
     def __init__(self, fluid="Air"):
         if fluid not in self.VALID_FLUIDS:
             raise ValueError(f"Brayton cycle restricted to non-condensable gases: {self.VALID_FLUIDS}")
         super().__init__(fluid)
         self.compressor = Compressor("Compressor")
         self.turbine = Turbine("Turbine")
-        
-    def get_component_list(self):
-        components = []
-        n_ic = getattr(self, '_n_ic_used', 0)
-        n_rh = getattr(self, '_n_rh_used', 0)
-        
-        for i in range(n_ic + 1):
-            components.append(f"Compressor {i+1}")
-            if i < n_ic:
-                components.append(f"Intercooler {i+1}")
-                
-        components.append("Combustor")
-        
-        for i in range(n_rh + 1):
-            components.append(f"Turbine {i+1}")
-            if i < n_rh:
-                components.append(f"Reheater {i+1}")
-                
-        components.append("Cooler/Exhaust")
-        return components
+        self.active_template = 'brayton_simple'
 
     def solve(self, params):
+        """
+        Routes to the appropriate sub-solver based on params['template'].
+        Unified signature: solve(params) — consistent with all other cycles.
+        """
         self.clear_states()
-        
-        # Mapping UI keys and providing defaults
-        defaults = {
-            'P_min': 0.1 * 1e6,
-            'P_max': 1.2 * 1e6,
-            'T_min': 25.0 + 273.15,
-            'T_max': 1100.0 + 273.15,
-        }
-        
-        current = defaults.copy()
-        if 'P_min' in params: current['P_min'] = params['P_min'] * 1e6
-        if 'P_max' in params: current['P_max'] = params['P_max'] * 1e6
-        if 'T_min' in params: current['T_min'] = params['T_min'] + 273.15
-        if 'T_max' in params: current['T_max'] = params['T_max'] + 273.15
-        
-        P_min = current['P_min']
-        P_max = current['P_max']
-        T_min = current['T_min']
-        T_max = current['T_max']
-        
-        n_ic = max(0, int(params.get('n_ic', 0)))
-        n_rh = max(0, int(params.get('n_rh', 0)))
-        
-        self._n_ic_used = n_ic
-        self._n_rh_used = n_rh
-        
-        eta_c, eta_t = 0.85, 0.90
-        self.T_hot = T_max
-        self.T_cold = T_min
-        
-        self._w_comp = 0.0
-        self._w_turb = 0.0
-        self._q_in = 0.0
+        template_key = params.get('template', 'brayton_simple')
+        self.active_template = template_key
+        if template_key == 'brayton_simple':
+            return self._solve_simple(params)
+        elif template_key == 'brayton_regen':
+            return self._solve_regen(params)
+        raise ValueError(f"Unknown template: {template_key}")
 
-        st_in = self.get_state('P', P_min, 'T', T_min, "Main Intake")
-        self.states[1] = st_in
-        
-        pr_stage_c = (P_max / P_min) ** (1 / max(1, n_ic + 1))
-        for i in range(n_ic + 1):
-            p_out = st_in.P * pr_stage_c
-            st_out = self.compressor.solve(st_in, p_out, eta_c, self.fluid)
-            st_out.note = f"Compressor {i+1} Exit"
-            self.states[len(self.states)+1] = st_out
-            self._w_comp += st_out.h - st_in.h
-            
-            if i < n_ic:
-                st_in = self.get_state('P', p_out, 'T', T_min, f"Intercooler {i+1} Exit")
-                self.states[len(self.states)+1] = st_in
-        
-        pr_stage_t = (P_max / P_min) ** (1 / max(1, n_rh + 1))
-        t_in = self.get_state('P', P_max, 'T', T_max, "Combustor Exit")
-        self.states[len(self.states)+1] = t_in
-        self._q_in += t_in.h - st_out.h
-        
-        for i in range(n_rh + 1):
-            p_out = t_in.P / pr_stage_t
-            st_out = self.turbine.solve(t_in, p_out, eta_t, self.fluid)
-            st_out.note = f"Turbine {i+1} Exit"
-            self.states[len(self.states)+1] = st_out
-            self._w_turb += t_in.h - st_out.h
-            
-            if i < n_rh:
-                t_in = self.get_state('P', p_out, 'T', T_max, f"Reheater {i+1} Exit")
-                self.states[len(self.states)+1] = t_in
-                self._q_in += t_in.h - st_out.h
-        
+    def _solve_simple(self, p):
+        # 1: Inlet
+        st1 = self.get_state('P', 101325, 'T', p['T_min'], "Comp Inlet")
+        # 2: Compressor outlet
+        P_high = st1.P * p['rp']
+        st2 = self.compressor.solve(st1, P_high, 0.85, self.fluid)
+        # 3: Turbine inlet
+        st3 = self.get_state('P', P_high, 'T', p['T_max'], "Turb Inlet")
+        # 4: Turbine exit
+        st4 = self.turbine.solve(st3, st1.P, 0.90, self.fluid)
+
+        self.states = {1: st1, 2: st2, 3: st3, 4: st4}
+        self.T_hot, self.T_cold = st3.T, st1.T
+        self._q_in = st3.h - st2.h
+        self._w_turbines = st3.h - st4.h
+        self._w_pumps = st2.h - st1.h # w_comp
         return self.states
 
+    def _solve_regen(self, p):
+        # 1: Comp Inlet
+        st1 = self.get_state('P', 101325, 'T', 300, "Comp Inlet")
+        P_high = st1.P * p['rp']
+        # 2: Comp Exit
+        st2 = self.compressor.solve(st1, P_high, 0.85, self.fluid)
+        # 4: Turb Inlet
+        st4 = self.get_state('P', P_high, 'T', p['T_max'], "Turb Inlet")
+        # 5: Turb Exit
+        st5 = self.turbine.solve(st4, st1.P, 0.90, self.fluid)
+        
+        # Regeneration: h3 = h2 + eps * (h5 - h2)
+        h3 = st2.h + p['epsilon'] * (st5.h - st2.h)
+        st3 = self.get_state('P', P_high, 'H', h3, "Combustor Inlet")
+        
+        self.states = {1: st1, 2: st2, 3: st3, 4: st4, 5: st5}
+        self.T_hot, self.T_cold = st4.T, st1.T
+        self._q_in = st4.h - st3.h
+        self._w_turbines = st4.h - st5.h
+        self._w_pumps = st2.h - st1.h
+        return self.states
+
+    def validate_inputs(self, params):
+        if params.get('T_max') and params.get('T_min'):
+            if params['T_max'] <= params['T_min']:
+                self.errors.append("Maximum temperature must be greater than minimum temperature.")
+        if params.get('rp'):
+            if params['rp'] <= 1.0:
+                self.errors.append("Pressure ratio must be greater than 1.")
+        return len(self.errors) == 0
+
+    def get_component_list(self):
+        if self.active_template == 'brayton_simple': return ["Compressor", "Combustor", "Turbine"]
+        if self.active_template == 'brayton_regen': return ["Compressor", "Regenerator (Cold)", "Combustor", "Turbine", "Regenerator (Hot)"]
+        return []
+
     def calculate_performance(self):
-        if not self.states:
-            return {}
-        w_net = self._w_turb - self._w_comp
+        w_net = self._w_turbines - self._w_pumps
         efficiency = (w_net / self._q_in) * 100 if self._q_in > 0 else 0
-        
-        # Approximate q_out for entropy gen
-        last_state = self.states[max(self.states)]
-        q_out = last_state.h - self.states[1].h
-        
+        q_out = self._q_in - w_net
         s_gen = self.calculate_entropy_generation(self._q_in, self.T_hot, q_out, self.T_cold)
+        x_dest = self.calculate_exergy_destruction(s_gen)
         sl_eff = self.calculate_second_law_efficiency(efficiency, self.T_hot, self.T_cold)
         
-        self.metrics = {
+        return {
             'efficiency': efficiency,
             'w_net': w_net / 1000,
             'q_in': self._q_in / 1000,
-            'q_out': q_out / 1000,
-            's_gen': s_gen,
-            'second_law_efficiency': sl_eff,
+            'x_dest': x_dest / 1000 if x_dest else 0,
+            'second_law_efficiency': sl_eff
         }
-        return self.metrics
-
-    def validate_inputs(self, params):
-        errors = []
-        p_min = params.get('P_min', 0.1)
-        p_max = params.get('P_max', 1.2)
-        t_min = params.get('T_min', 25.0)
-        t_max = params.get('T_max', 1100.0)
-        
-        if p_min >= p_max:
-            errors.append("P_max must be greater than P_min.")
-        if t_min >= t_max:
-            errors.append("T_max must be greater than T_min.")
-        return errors

@@ -142,6 +142,72 @@ class FlowChartGenerator:
         return None
 
     @staticmethod
+    def layout_smart_auto(comps, states):
+        """Universal smart auto-layout for any thermodynamic cycle."""
+        positions = {'components': {}, 'states': {}}
+        connections = []
+        annotations = []
+        
+        import math
+        sorted_states = sorted(states.keys())
+        n_states = len(sorted_states)
+        n_comps = len(comps)
+        
+        cx, cy = 50, 35
+        rx, ry = 38, 22
+        
+        for i, state_id in enumerate(sorted_states):
+            theta = 5 * math.pi / 4 - (i * 2 * math.pi / max(1, n_states))
+            x = cx + rx * math.cos(theta)
+            y = cy + ry * math.sin(theta)
+            
+            if n_states == 4:
+                x = 20 if i in [0, 1] else 80
+                y = 20 if i in [0, 3] else 50
+                
+            positions['states'][state_id] = (x, y)
+            
+        for i in range(n_states):
+            st1_id = sorted_states[i]
+            st2_id = sorted_states[(i + 1) % n_states]
+            
+            connections.append((st1_id, st2_id, ""))
+            
+            if i < n_comps:
+                comp = comps[i]
+                x1, y1 = positions['states'][st1_id]
+                x2, y2 = positions['states'][st2_id]
+                positions['components'][comp] = ((x1 + x2) / 2, (y1 + y2) / 2)
+                
+                current_st = states[st1_id]
+                next_st = states[st2_id]
+                if current_st.h is not None and next_st.h is not None:
+                    delta_h = next_st.h - current_st.h
+                    comp_name = comp.lower()
+                    annot_x, annot_y = ((x1 + x2) / 2) + 6, ((y1 + y2) / 2) + 6
+                    if 'turb' in comp_name or 'exp' in comp_name:
+                        annotations.append(((annot_x, annot_y), f"W={abs(delta_h)/1000:.0f}kJ/kg", '#2E8B57'))
+                    elif 'pump' in comp_name or 'comp' in comp_name:
+                        annotations.append(((annot_x, annot_y), f"W_in={delta_h/1000:.0f}kJ/kg", '#DC143C'))
+                    elif 'boiler' in comp_name or 'comb' in comp_name or 'heat' in comp_name:
+                        annotations.append(((annot_x, annot_y), f"Q_in={abs(delta_h)/1000:.0f}kJ/kg", '#FF6347'))
+                    elif 'cond' in comp_name or 'cool' in comp_name:
+                        annotations.append(((annot_x, annot_y), f"Q_out={abs(delta_h)/1000:.0f}kJ/kg", '#4169E1'))
+
+        for state_id, st in states.items():
+            if state_id in positions['states']:
+                x, y = positions['states'][state_id]
+                temp = f"{st.T - 273.15:.0f}°C" if st.T else ""
+                press = f"{st.P / 1e6:.1f}MPa" if st.P else ""
+                info = f"{temp}\n{press}".strip()
+                if info:
+                    dx, dy = x - cx, y - cy
+                    norm = math.hypot(dx, dy) or 1
+                    annotations.append(((x + (dx/norm)*6, y + (dy/norm)*6), info, '#444'))
+
+        return positions, connections, annotations
+
+    @staticmethod
     def layout_generic(comps, states):
         """Generic layout for unknown cycles."""
         positions = {'components': {}, 'states': {}}
@@ -505,36 +571,10 @@ class FlowChartGenerator:
         ax.set_ylim(0, 60)
         ax.axis('off')
 
-        # Get cycle-specific layout using normalized cycle name or alias
-        cycle_key = FlowChartGenerator.normalize_cycle_type(cycle_type)
-        layout_func = FlowChartGenerator.CYCLE_LAYOUTS.get(cycle_key, FlowChartGenerator.layout_generic)
-        positions, connections, annotations = layout_func(component_list, states)
+        # Use the universal smart auto layout
+        positions, connections, annotations = FlowChartGenerator.layout_smart_auto(component_list, states)
 
-        # Draw components
-        for comp_name, (x, y) in positions['components'].items():
-            drawer_key = "default"
-            # Match the most specific key first
-            for key in sorted(FlowChartGenerator.COMPONENT_DRAWERS.keys(), key=len, reverse=True):
-                if key.lower() in comp_name.lower():
-                    drawer_key = key
-                    break
-            
-            drawer = FlowChartGenerator.COMPONENT_DRAWERS.get(drawer_key)
-            drawer(ax, x, y)
-
-        # Draw state points and connections
-        sorted_states = sorted(states.keys())
-        for i, state_id in enumerate(sorted_states):
-            st = states[state_id]
-            x, y = positions['states'][state_id]
-            
-            # Draw state anchor with phase color
-            color = FlowChartGenerator.get_phase_color(st)
-            circ = patches.Circle((x, y), 3.5, fc="white", ec=color, lw=2.5, zorder=5)
-            ax.add_patch(circ)
-            ax.text(x, y, str(state_id), ha='center', va='center', fontsize=10, fontweight='bold', color='#333')
-
-        # Draw flow connections
+        # 1) Draw flow connections FIRST so they go under components
         for start_id, end_id, label in connections:
             if start_id in positions['states'] and end_id in positions['states']:
                 p1 = positions['states'][start_id]
@@ -552,6 +592,31 @@ class FlowChartGenerator:
                     ax.text(mid_x, mid_y + 2, label, ha='center', va='bottom', 
                            fontsize=8, fontweight='bold', color='#333', 
                            bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+
+        # 2) Draw components NEXT so they mask the lines properly
+        for comp_name, (x, y) in positions['components'].items():
+            drawer_key = "default"
+            for key in sorted(FlowChartGenerator.COMPONENT_DRAWERS.keys(), key=len, reverse=True):
+                if key.lower() in comp_name.lower():
+                    drawer_key = key
+                    break
+            
+            drawer = FlowChartGenerator.COMPONENT_DRAWERS.get(drawer_key)
+            drawer(ax, x, y)
+
+        # 3) Draw state points on top of connections
+        sorted_states = sorted(states.keys())
+        for i, state_id in enumerate(sorted_states):
+            st = states[state_id]
+            x, y = positions['states'][state_id]
+            
+            # Draw state anchor with phase color
+            color = FlowChartGenerator.get_phase_color(st)
+            circ = patches.Circle((x, y), 3.5, fc="white", ec=color, lw=2.5, zorder=5)
+            ax.add_patch(circ)
+            ax.text(x, y, str(state_id), ha='center', va='center', fontsize=10, fontweight='bold', color='#333')
+
+        # (Connections were already drawn above)
 
         # Add annotations
         for (x, y), text, color in annotations:
@@ -588,6 +653,6 @@ class FlowChartGenerator:
             rix.text(0.1, 0.1, f"Q_out = {metrics.get('q_out', 0):.0f} kJ/kg", fontsize=8, color='#333')
 
         buf = io.BytesIO()
-        plt.savefig(buf, format='svg', bbox_inches='tight', transparent=True)
+        plt.savefig(buf, format='svg', bbox_inches='tight', transparent=False, facecolor='#f9f9f9')
         plt.close(fig)
         return buf

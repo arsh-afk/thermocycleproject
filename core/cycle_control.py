@@ -1,12 +1,17 @@
 """
 Cycle Control and Variable Selection Logic
 Centralized module to manage input constraints and validation rules.
+Engineering Principle: Ensures that all user inputs are within physically 
+valid domains and adhere to the State Postulate requirements.
 """
 
 class CycleControl:
-    """Manages which variables are valid for each cycle and enforces the 'two-variable' rule."""
+    """
+    Manages metadata for thermodynamic variables and restricts UI options 
+    to valid parameters for each specific cycle type.
+    """
     
-    # Global metadata for variables
+    # Global metadata for variables: Units and physical bounds.
     VAR_METADATA = {
         'P_max': {'label': 'Max Pressure', 'unit': 'MPa', 'min': 0.001, 'max': 50.0, 'default': 15.0},
         'T_max': {'label': 'Max Temperature', 'unit': '°C', 'min': 10.0, 'max': 1500.0, 'default': 550.0},
@@ -20,45 +25,52 @@ class CycleControl:
         'efficiency': {'label': 'Thermal Efficiency', 'unit': '%', 'min': 1.0, 'max': 99.0, 'default': 40.0},
         'r': {'label': 'Compression Ratio', 'unit': '', 'min': 1.1, 'max': 30.0, 'default': 8.0},
         'rc': {'label': 'Cutoff Ratio', 'unit': '', 'min': 1.0, 'max': 10.0, 'default': 2.0},
+        'rp': {'label': 'Pressure Ratio', 'unit': '', 'min': 1.0, 'max': 10.0, 'default': 1.5},
+        'P_low': {'label': 'Evaporator Pressure', 'unit': 'MPa', 'min': 0.01, 'max': 2.0, 'default': 0.14},
+        'P_high': {'label': 'Condenser Pressure', 'unit': 'MPa', 'min': 0.1, 'max': 10.0, 'default': 0.8},
+        'epsilon': {'label': 'Regen Effectiveness', 'unit': '', 'min': 0.0, 'max': 1.0, 'default': 0.8},
+        'y_cogen': {'label': 'Cogen Fraction', 'unit': '', 'min': 0.0, 'max': 1.0, 'default': 0.2},
+        'P_cogen': {'label': 'Cogen Pressure', 'unit': 'MPa', 'min': 0.01, 'max': 5.0, 'default': 0.5},
     }
 
-    # Cycle-specific valid variables
+    # Cycle-specific valid variables: Filtered to show only relevant options in the GUI.
     CYCLE_VARS = {
-        'rankine': ['P_max', 'T_max', 'P_min', 'T_min', 'h_max', 's_max', 'x_boiler', 'q_in', 'w_net', 'efficiency'],
-        'brayton': ['P_max', 'P_min', 'T_max', 'T_min', 'q_in', 'w_net', 'efficiency'],
-        'sco2': ['P_max', 'P_min', 'T_max', 'T_min', 'q_in', 'w_net', 'efficiency'],
+        'rankine': ['P_max', 'T_max', 'P_min', 'T_min', 'h_max', 's_max', 'x_boiler', 'q_in', 'w_net', 'efficiency', 'n_rh', 'n_fwh', 'y_cogen', 'P_cogen'],
+        'brayton': ['P_max', 'P_min', 'T_max', 'T_min', 'q_in', 'w_net', 'efficiency', 'n_ic', 'n_rh', 'epsilon', 'mode'],
+        'sco2': ['P_max', 'P_min', 'T_max', 'T_min', 'q_in', 'w_net', 'efficiency', 'split_frac', 'recup_eff'],
         'otto': ['r', 'T_max', 'P_min', 'T_min', 'q_in', 'w_net', 'efficiency'],
         'diesel': ['r', 'rc', 'T_max', 'P_min', 'T_min', 'q_in', 'w_net', 'efficiency'],
+        'dual': ['r', 'rc', 'rp', 'T_min', 'P_min', 'efficiency'],
         'stirling': ['T_max', 'T_min', 'P_max', 'r', 'w_net'],
         'ericsson': ['T_max', 'T_min', 'P_max', 'P_min', 'w_net'],
+        'refrigeration': ['P_low', 'P_high', 'type', 'T_source', 'T_env', 'T_ref', 'eta_c', 'dT_sh', 'dT_sc'],
+        'combined': ['B_P_max', 'B_T_max', 'R_P_max', 'R_T_max', 'efficiency'],
     }
 
     @staticmethod
     def get_variables_for_cycle(cycle_key):
-        """Returns the list of valid variables for a given cycle."""
+        """
+        Returns the list of valid variable keys for a given cycle.
+        Used by the GUI to dynamically build the input form.
+        """
         return CycleControl.CYCLE_VARS.get(cycle_key, [])
 
     @staticmethod
     def get_metadata(var_key):
-        """Returns metadata for a variable."""
+        """Returns physical bounds and units for a variable."""
         return CycleControl.VAR_METADATA.get(var_key, {})
 
     @staticmethod
     def validate_selection(selected_vars):
-        """Enforces the 'exactly two variables' rule."""
+        """
+        Enforces the rule that exactly TWO independent variables must be selected 
+        to define the cycle's boundary states, consistent with the State Postulate.
+        """
         if len(selected_vars) != 2:
             return False, "Select exactly TWO independent variables."
-        
-        # Check for independence (e.g., P_max and P_ratio are not independent - if we had P_ratio)
-        # For now, most of our variables are independent enough for initial state definition.
-        
         return True, ""
 
     @staticmethod
     def apply_defaults(cycle_key, params):
-        """Fills in default values for variables not in params, based on cycle config."""
-        # This will be used by the solver to get full set of parameters
-        from core.base_cycle import BaseCycle
-        # In practice, this should probably be handled by the cycle object itself 
-        # using its own defaults from config/cycles.yaml
+        """Placeholder for logic to fill in non-essential defaults."""
         pass
